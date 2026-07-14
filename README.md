@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Autonomous Computer Operator (ACO)
 
 An AI-powered autonomous agent that plans and executes multi-step workflows on your computer using natural language. Just tell ACO what you want to do, and it figures out the steps — browsing the web, managing files, running terminal commands, and more.
@@ -277,3 +278,6 @@ Autonomous-Computer-Operator/
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
+=======
+# AcadChores-ACO
+>>>>>>> 2b2c8516ee73df9c6880942aa710b17c91fdee7e
