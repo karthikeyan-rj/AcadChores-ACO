@@ -22,6 +22,8 @@ async def register_plugin(
     descriptor: PluginDescriptor,
     current_user: User = Depends(get_current_active_user)
 ):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required to register plugins")
     try:
         plugin_loader.register(descriptor)
         return {"success": True, "message": f"Plugin {descriptor.name} registered."}
@@ -33,6 +35,8 @@ async def run_plugin(
     req: RunPluginRequest,
     current_user: User = Depends(get_current_active_user)
 ):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required to run plugins")
     plugin = plugin_loader.get_plugin(req.plugin_name)
     if not plugin:
         raise HTTPException(status_code=404, detail="Plugin not found.")

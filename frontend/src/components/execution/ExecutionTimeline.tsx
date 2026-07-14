@@ -20,7 +20,7 @@ export function ExecutionTimeline({ logs, stateMachineStatus }: ExecutionTimelin
   if (logs.length === 0 && stateMachineStatus === 'Idle') return null;
 
   return (
-    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-4 py-2.5 border-b border-border">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Timeline</span>
       </div>

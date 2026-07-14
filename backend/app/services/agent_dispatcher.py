@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import shlex
@@ -7,7 +8,8 @@ import asyncio
 import subprocess
 import traceback
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, List, Set
+from urllib.parse import urlparse
 from playwright.async_api import async_playwright
 
 from app.core.security import permission_guard
@@ -20,6 +22,63 @@ logger = logging.getLogger(__name__)
 
 BROWSER_DATA_DIR = os.path.join(os.path.expanduser("~"), ".aco_browser_data")
 
+# --- Safety constants ---
+
+# Destructive terminal commands that must never be executed
+BLOCKED_TERMINAL_PATTERNS: List[str] = [
+    r'\brm\s+-rf\s+/',
+    r'\bformat\s+[cCdD]:',
+    r'\bdel\s+/[sS]\s+/[qQ]',
+    r'\bshutdown\s',
+    r'\breboot\b',
+    r'\bmkfs\b',
+    r'\bdd\s+if=',
+    r':\(\)\s*\{',         # fork bomb
+    r':\(\)\{',            # fork bomb (no space)
+    r'\bsudo\s+rm\s+-rf\s+/',
+    r'\btaskkill\s+/F\s+/IM\s+explorer',
+    r'\bwevtutil\s+cl\s+',
+    r'\bcd\s+\.\.',           # no escaping to parent from sandbox
+    r'\bcacls\b',
+    r'\bicacls\b.*\b/\w*\s*remov',  # remove permissions
+    r'\breg\s+delete\b',
+    r'\bnet\s+user\b.*/delete',  # net user ... /delete
+]
+
+# Compiled regex for performance
+_BLOCKED_TERMINAL_RE = re.compile('|'.join(BLOCKED_TERMINAL_PATTERNS), re.IGNORECASE)
+
+# Maximum output size from terminal commands (1 MB)
+MAX_TERMINAL_OUTPUT_BYTES: int = 1_000_000
+
+# Allowed URL schemes for browser navigation
+ALLOWED_URL_SCHEMES: Set[str] = {"http", "https"}
+
+# Maximum scraped text size (500 KB)
+MAX_SCRAPED_TEXT_BYTES: int = 500_000
+
+# System directories that file agent must not write/delete
+BLOCKED_FILE_PATHS: List[str] = [
+    "C:\\Windows",
+    "C:\\Program Files",
+    "C:\\Program Files (x86)",
+    "C:\\ProgramData",
+    "C:\\System Volume Information",
+    "/etc",
+    "/usr",
+    "/bin",
+    "/sbin",
+    "/lib",
+    "/boot",
+    "/dev",
+    "/proc",
+    "/sys",
+    "/root",
+]
+
+# Task execution timeout (5 minutes)
+TASK_EXECUTION_TIMEOUT: float = 300.0
+
 
 def _needs_shell(cmd: str) -> bool:
     """Check if a command requires shell interpretation (pipes, redirects, &&, etc.)."""
@@ -28,7 +87,51 @@ def _needs_shell(cmd: str) -> bool:
         if indicator in cmd:
             return True
     return False
+
 SESSION_MARKER = os.path.join(BROWSER_DATA_DIR, ".session_active")
+
+
+def _is_terminal_command_blocked(command: str) -> Optional[str]:
+    """Check if a terminal command matches any blocked destructive pattern.
+    Returns the matched pattern description if blocked, None if safe."""
+    match = _BLOCKED_TERMINAL_RE.search(command)
+    if match:
+        return f"Blocked destructive pattern: {match.group()}"
+    return None
+
+
+def _validate_url_scheme(url: str) -> bool:
+    """Validate that a URL uses only allowed schemes (http/https)."""
+    try:
+        parsed = urlparse(url)
+        return parsed.scheme.lower() in ALLOWED_URL_SCHEMES
+    except Exception:
+        return False
+
+
+def _is_path_blocked(path: str, action: str = "write") -> Optional[str]:
+    """Check if a file path is in a blocked system directory.
+    Returns the blocking reason if blocked, None if safe."""
+    normalized = os.path.normpath(os.path.expanduser(os.path.expandvars(path)))
+    for blocked in BLOCKED_FILE_PATHS:
+        blocked_norm = os.path.normpath(blocked)
+        if normalized.startswith(blocked_norm + os.sep) or normalized == blocked_norm:
+            return f"Path '{path}' is inside blocked system directory: {blocked}"
+    return None
+
+
+def _truncate_output(text: str, max_bytes: int = MAX_TERMINAL_OUTPUT_BYTES) -> str:
+    """Truncate output to max_bytes, preserving the end (most relevant part)."""
+    encoded = text.encode("utf-8", errors="replace")
+    if len(encoded) <= max_bytes:
+        return text
+    truncated = encoded[-max_bytes:]
+    return truncated.decode("utf-8", errors="replace")
+
+
+def _sanitize_js_string(value: str) -> str:
+    """Escape a string for safe interpolation inside a JavaScript string literal."""
+    return value.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
 
 class BaseAgent(ABC):
     @abstractmethod
@@ -418,8 +521,6 @@ class BrowserAgent(BaseAgent):
         try:
             await self._ensure_browser(user_id)
         except Exception as e:
-            with open("C:\\Users\\santhosh raj\\projects\\Acad\\backend\\debug_error.txt", "w") as f:
-                f.write(f"ERROR: {e}\nTYPE: {type(e)}\nTRACE:\n{traceback.format_exc()}")
             logger.error(f"Browser launch failed: {e}\n{traceback.format_exc()}")
             raise RuntimeError(f"Failed to launch browser: {e}")
         await progress_cb(40, "Browser environment ready.")
@@ -428,6 +529,8 @@ class BrowserAgent(BaseAgent):
         result = {}
         if action == "navigate":
             url = params["url"]
+            if not _validate_url_scheme(url):
+                raise ValueError(f"Blocked navigation to URL with disallowed scheme: {url}")
             await progress_cb(60, f"Navigating to URL: {url}")
             try:
                 await page.goto(url, timeout=30000, wait_until="domcontentloaded")
@@ -493,9 +596,10 @@ class BrowserAgent(BaseAgent):
             # JS click as final attempt
             if not clicked:
                 try:
+                    safe_text = _sanitize_js_string(fallback_text or "Send")
                     clicked_js = await page.evaluate(f"""
                         (() => {{
-                            const targetText = '{fallback_text or "Send"}';
+                            const targetText = '{safe_text}';
 
                             function isEnabled(el) {{
                                 if (!el) return false;
@@ -753,6 +857,9 @@ class BrowserAgent(BaseAgent):
                 result = {"text": await asyncio.wait_for(page.inner_text("body"), timeout=10)}
             except Exception:
                 result = {"text": await asyncio.wait_for(page.evaluate("document.body.innerText.substring(0, 15000)"), timeout=10)}
+            # Enforce output size limit
+            if result.get("text"):
+                result["text"] = _truncate_output(result["text"], MAX_SCRAPED_TEXT_BYTES)
         elif action == "scrape_links":
             link_count = params.get("count", 5)
             domain_filter = params.get("domain", "")
@@ -919,6 +1026,10 @@ class FileAgent(BaseAgent):
                 path = os.path.expandvars(path)
             else:
                 raise ValueError("write action requires either 'path' or 'filename' parameter")
+            # Block writes to system directories
+            block_reason = _is_path_blocked(path, "write")
+            if block_reason:
+                raise PermissionError(block_reason)
             await progress_cb(50, f"Writing file: {path}")
             os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
             with open(path, "w", encoding="utf-8") as f:
@@ -928,6 +1039,10 @@ class FileAgent(BaseAgent):
             path = params.get("path", "")
             path = os.path.expanduser(path)
             path = os.path.expandvars(path)
+            # Block deletes to system directories
+            block_reason = _is_path_blocked(path, "delete")
+            if block_reason:
+                raise PermissionError(block_reason)
             await progress_cb(70, f"Deleting file: {path}")
             if os.path.exists(path):
                 os.remove(path)
@@ -1006,7 +1121,13 @@ class TerminalAgent(BaseAgent):
             raise PermissionError("Terminal action was rejected by user policy permissions.")
 
         command = params["command"]
-        await progress_cb(50, f"Executing terminal command: {command}")
+
+        # Block destructive commands
+        block_reason = _is_terminal_command_blocked(command)
+        if block_reason:
+            raise PermissionError(f"Blocked dangerous terminal command: {block_reason}")
+
+        await progress_cb(50, f"Executing terminal command: {command[:200]}")
 
         timeout = 60.0
         if "ping" in command.lower():
@@ -1048,6 +1169,9 @@ class TerminalAgent(BaseAgent):
 
         rc, stdout, stderr = await loop.run_in_executor(None, run_proc)
         
+        # Enforce output size limit
+        stdout = _truncate_output(stdout or "")
+        stderr = _truncate_output(stderr or "")
         output_preview = (stdout or stderr or "").strip()[:500]
         await progress_cb(90, f"Command finished (rc={rc}): {output_preview}")
         return {
@@ -1060,7 +1184,11 @@ class TerminalAgent(BaseAgent):
 class VisionAgent(BaseAgent):
     async def execute(self, action: str, params: Dict[str, Any], progress_cb: Callable[[int, str], Any]) -> Dict[str, Any]:
         await progress_cb(15, "Vision element mapping request.")
-        
+
+        authorized = await permission_guard.authorize_action("vision", action, params)
+        if not authorized:
+            raise PermissionError(f"User denied vision action: {action}")
+
         if action == "find_text":
             text = params["text"]
             await progress_cb(50, f"Searching for text: '{text}' on screen")

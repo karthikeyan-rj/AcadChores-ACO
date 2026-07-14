@@ -51,7 +51,7 @@ export function ExecutionPanel({ stateMachineStatus, activeStepIndex, totalSteps
   const confidence = 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 space-y-4">
+    <div className="rounded-xl border border-border bg-card p-4 space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Execution</span>
         {isExecuting && (

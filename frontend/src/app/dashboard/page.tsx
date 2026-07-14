@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Play, Globe, GitBranch, Clock, BarChart3,
-  Activity, Shield, RefreshCw, Search, Puzzle, ArrowRight, Loader2,
+  Activity, Shield, RefreshCw, Search, ArrowRight, Loader2,
   CheckCircle2, XCircle, Layers, Cpu, HardDrive, Database,
-  Brain, Zap, FileText, ChevronRight, Server
+  Brain, FileText, Server
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useDashboardMetrics, useBackendHealth } from '@/lib/hooks';
@@ -18,8 +18,6 @@ const quickActions = [
   { icon: Play, label: 'New Workflow', desc: 'Execute a new task', href: '/chat', color: 'text-primary' },
   { icon: Globe, label: 'Open Browser', desc: 'Launch browser session', href: '/chat', color: 'text-blue-400' },
   { icon: Search, label: 'Search Files', desc: 'Find local files', href: '/files', color: 'text-amber-400' },
-  { icon: Clock, label: 'Schedule Task', desc: 'Create scheduled job', href: '/scheduler', color: 'text-cyan-400' },
-  { icon: Puzzle, label: 'Plugin Store', desc: 'Browse plugins', href: '/plugins', color: 'text-purple-400' },
   { icon: BarChart3, label: 'Analytics', desc: 'View metrics', href: '/analytics', color: 'text-emerald-400' },
 ];
 
@@ -39,7 +37,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
-        <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-8 text-center">
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
           <XCircle size={32} className="text-danger mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-400">Failed to load dashboard metrics</p>
           <p className="text-xs text-gray-600 mt-1">{error}</p>
@@ -66,9 +64,9 @@ export default function DashboardPage() {
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold">
-          Welcome back, <span className="gradient-text">{user?.name?.split(' ')[0] || 'Operator'}</span>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <h1 className="text-2xl font-bold text-foreground">
+          Welcome back, {user?.name?.split(' ')[0] || 'Operator'}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Autonomous Computer Operator — Enterprise Orchestrator v1.0
@@ -104,7 +102,7 @@ export default function DashboardPage() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Recent Activity */}
-        <div className="lg:col-span-2 rounded-xl border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Recent Activity</span>
             <button onClick={() => router.push('/history')} className="text-[10px] text-primary hover:underline cursor-pointer">View All</button>
@@ -131,7 +129,7 @@ export default function DashboardPage() {
         {/* Right Column */}
         <div className="space-y-5">
           {/* System Health */}
-          <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-5 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">System Health</span>
               <span className={cn('text-[10px] font-medium', connected ? 'text-accent' : 'text-danger')}>
@@ -149,8 +147,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* AI & Performance */}
-          <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-5 space-y-4">
+          {/* AI Performance */}
+          <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">AI Performance</span>
             <div className="space-y-3">
               <MetricRow label="Total Requests" value={ai.total_requests || 0} />
@@ -161,7 +159,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Queue & Workers */}
-          <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-5 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Workers & Queue</span>
             <div className="space-y-3">
               <MetricRow label="Queue Length" value={queue.tasks_waiting || 0} />
@@ -188,13 +186,13 @@ export default function DashboardPage() {
           {quickActions.map((action, i) => (
             <motion.button
               key={i}
-              whileHover={{ y: -2, scale: 1.02 }}
+              whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => router.push(action.href)}
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:bg-card-hover hover:border-border-light transition cursor-pointer text-center"
             >
               <action.icon size={20} className={action.color} />
-              <span className="text-xs font-medium">{action.label}</span>
+              <span className="text-xs font-medium text-foreground">{action.label}</span>
               <span className="text-[10px] text-gray-500">{action.desc}</span>
             </motion.button>
           ))}
@@ -227,9 +225,9 @@ function DashboardSkeleton() {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: any; color: string }) {
   return (
-    <motion.div whileHover={{ y: -1 }} className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 transition-all">
+    <motion.div whileHover={{ y: -1 }} className="rounded-xl border border-border bg-card p-4 transition-all">
       <div className={cn('mb-2', color)}>{icon}</div>
-      <p className="text-lg font-bold">{value}</p>
+      <p className="text-lg font-bold text-foreground">{value}</p>
       <p className="text-[10px] text-gray-500">{label}</p>
     </motion.div>
   );
@@ -255,7 +253,7 @@ function MetricRow({ label, value }: { label: string; value: any }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-xs font-medium">{value}</span>
+      <span className="text-xs font-medium text-foreground">{value}</span>
     </div>
   );
 }
@@ -263,7 +261,7 @@ function MetricRow({ label, value }: { label: string; value: any }) {
 function ResourceCard({ icon, label, value, percent }: { icon: React.ReactNode; label: string; value: string; percent: number }) {
   const color = percent > 80 ? 'text-danger' : percent > 60 ? 'text-amber-400' : 'text-accent';
   return (
-    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 text-xs text-gray-400">
           <span className={color}>{icon}</span>

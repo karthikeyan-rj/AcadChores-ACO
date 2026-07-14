@@ -17,6 +17,12 @@ from app.services.language_engine import (
 
 logger = logging.getLogger(__name__)
 
+# Safe bounds for per-user settings (backend enforces these limits)
+MIN_RETRIES = 0
+MAX_RETRIES = 3
+MIN_QUALITY = 50
+MAX_QUALITY = 100
+
 # Resolve actual Windows user folders (handles OneDrive redirection)
 _USER_DIRS: Dict[str, str] = {}
 
@@ -294,38 +300,123 @@ class PlannerService:
         
         self.app = workflow.compile()
 
-    async def generate_workflow_steps(self, prompt: str) -> Dict[str, Any]:
-        """LLM-first planning. Falls back to rule-based only when LLM fails or returns empty."""
-        prompt_lower = prompt.lower()
+    async def generate_workflow_steps(self, prompt: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """LLM-first planning with retry, quality validation, and cloud fallback.
 
-        # PRIMARY: Send to LLM planner — it understands natural language best
-        llm_steps = []
-        try:
-            initial_state = PlannerState(user_prompt=prompt)
-            final_state = await self.app.ainvoke(initial_state)
+        Flow:
+          1. Run local Ollama planner (with retries).
+          2. Validate quality via WorkflowValidator.
+          3. If quality < threshold, retry local up to LOCAL_PLANNER_RETRY_COUNT times.
+          4. If still below threshold and cloud fallback enabled, call cloud API once.
+          5. Return metadata: planner_source, quality_score, fallback_used, local_attempts.
+        """
+        from app.core.config import settings
+        from app.services.workflow_validator import WorkflowValidator
+        from app.services.credential_store import get_api_key
+        from app.services.cloud_planner import generate_cloud_workflow
+        from app.services.fallback_tracker import record_fallback_usage, get_daily_usage_count
 
-            if final_state.get("errors"):
-                logger.warning(f"LLM planner errors: {final_state['errors']}")
+        # --- Resolve per-user settings (priority: safe backend limits → user setting → backend default) ---
+        user_cloud_enabled = getattr(settings, "CLOUD_FALLBACK_ENABLED", False)
+        user_cloud_provider = getattr(settings, "CLOUD_AI_PROVIDER", "openai")
+        user_cloud_model = getattr(settings, "CLOUD_AI_MODEL", "gpt-4o-mini")
+        retry_count = getattr(settings, "LOCAL_PLANNER_RETRY_COUNT", 1)
+        min_quality = getattr(settings, "WORKFLOW_MIN_QUALITY_SCORE", 70)
 
-            llm_steps = final_state.get("steps", [])
-            # Normalize LLM output: fix common field name mistakes
-            for idx, step in enumerate(llm_steps):
-                if "parameters" not in step and "params" in step:
-                    step["parameters"] = step.pop("params")
-                if "step_id" not in step:
-                    step["step_id"] = f"step_{idx + 1}"
-                if "name" not in step:
-                    step["name"] = step.get("action", "unknown")
-        except Exception as e:
-            logger.warning(f"LLM planner failed: {e}. Falling back to rule-based.")
+        if user_id:
+            try:
+                from app.infrastructure.db.models import UserSettings
+                user_settings = await UserSettings.find_one(UserSettings.user_id == user_id)
+                if user_settings:
+                    user_cloud_enabled = user_settings.cloud_fallback_enabled
+                    user_cloud_provider = user_settings.cloud_provider
+                    user_cloud_model = user_settings.cloud_model
+                    # Clamp user values within safe backend limits
+                    user_retry = user_settings.local_planner_retry_count
+                    retry_count = max(MIN_RETRIES, min(user_retry, MAX_RETRIES))
+                    user_quality = user_settings.workflow_quality_threshold
+                    min_quality = max(MIN_QUALITY, min(user_quality, MAX_QUALITY))
+            except Exception as e:
+                logger.warning(f"Failed to load user settings for {user_id}: {e}")
+        wf_validator = WorkflowValidator(min_quality_score=min_quality)
 
-        if llm_steps:
-            # The 7B model often returns only 1 step — complete the plan if incomplete
+        metadata: Dict[str, Any] = {
+            "planner_source": "ollama",
+            "quality_score": 0,
+            "fallback_used": False,
+            "local_attempts": 0,
+            "cloud_attempts": 0,
+            "validation_errors": [],
+        }
+
+        best_steps: List[Dict[str, Any]] = []
+        best_validation: Dict[str, Any] = {"score": 0, "is_valid": False}
+
+        # --- Phase 1: Local planner with retries ---
+        for attempt in range(retry_count + 1):
+            metadata["local_attempts"] = attempt + 1
+            llm_steps: List[Dict[str, Any]] = []
+            final_state: Dict[str, Any] = {}
+            try:
+                initial_state = PlannerState(user_prompt=prompt)
+                final_state = await self.app.ainvoke(initial_state)
+
+                if final_state.get("errors"):
+                    logger.warning(f"LLM planner errors (attempt {attempt+1}): {final_state['errors']}")
+
+                llm_steps = final_state.get("steps", [])
+                for idx, step in enumerate(llm_steps):
+                    if "parameters" not in step and "params" in step:
+                        step["parameters"] = step.pop("params")
+                    if "step_id" not in step:
+                        step["step_id"] = f"step_{idx + 1}"
+                    if "name" not in step:
+                        step["name"] = step.get("action", "unknown")
+            except Exception as e:
+                logger.warning(f"LLM planner failed (attempt {attempt+1}): {e}")
+
+            if not llm_steps:
+                continue
+
             llm_steps = await self._complete_incomplete_plan(prompt, llm_steps)
-            logger.info(f"Using LLM plan for prompt: {prompt[:80]} ({len(llm_steps)} steps)")
 
-            # Sanity check: parsed_intent vs actual step agent types
-            parsed_intent = final_state.get("parsed_intent", "")
+            validation = wf_validator.validate({"steps": llm_steps}, prompt)
+            logger.info(
+                f"Planner attempt {attempt+1}: {len(llm_steps)} steps, "
+                f"quality={validation['score']}/{min_quality}, valid={validation['is_valid']}"
+            )
+
+            if validation["score"] > best_validation.get("score", 0):
+                best_validation = validation
+                best_steps = llm_steps
+
+            if validation["is_valid"]:
+                metadata["planner_source"] = "ollama"
+                metadata["quality_score"] = validation["score"]
+                metadata["validation_errors"] = validation.get("errors", [])
+                best_steps = llm_steps
+                break
+
+        # --- Phase 2: Cloud fallback if local quality too low ---
+        if best_validation.get("score", 0) < min_quality and user_cloud_enabled:
+            daily_limit = getattr(settings, "CLOUD_FALLBACK_DAILY_LIMIT", 20)
+            if user_id and daily_limit > 0:
+                daily_count = await get_daily_usage_count(user_id)
+                if daily_count >= daily_limit:
+                    logger.warning(f"Cloud fallback daily limit reached ({daily_limit}) for user {user_id}")
+                else:
+                    await self._try_cloud_fallback(prompt, user_id, metadata, best_steps, best_validation, min_quality, user_cloud_provider, user_cloud_model)
+            else:
+                await self._try_cloud_fallback(prompt, user_id, metadata, best_steps, best_validation, min_quality, user_cloud_provider, user_cloud_model)
+
+        # --- Phase 2.5: Ensure metadata reflects best score found ---
+        if best_validation.get("score", 0) > metadata.get("quality_score", 0):
+            metadata["quality_score"] = best_validation["score"]
+            metadata["validation_errors"] = best_validation.get("errors", [])
+
+        # --- Phase 3: Attach metadata to result ---
+        if best_steps:
+            parsed_intent = final_state.get("parsed_intent", "") if final_state else ""
             intent_agent_map = {
                 "shell_execution": "terminal",
                 "browser_search": "browser",
@@ -334,28 +425,25 @@ class PlannerService:
             }
             expected_agent = intent_agent_map.get(parsed_intent)
             if expected_agent:
-                actual_agents = {s.get("agent_type") for s in llm_steps}
+                actual_agents = {s.get("agent_type") for s in best_steps}
                 if expected_agent not in actual_agents and actual_agents:
                     logger.warning(
                         f"Intent-step mismatch: parsed_intent={parsed_intent} expects {expected_agent} "
                         f"but steps use {actual_agents}. Prompt: {prompt[:80]}"
                     )
 
-            result = {"steps": llm_steps}
+            result: Dict[str, Any] = {"steps": best_steps, "planner_metadata": metadata}
 
-            # Surface inline pending_confirmation from steps (e.g. Fix 1b destructive terminal commands)
-            for s in llm_steps:
+            for s in best_steps:
                 if "pending_confirmation" in s:
                     result["pending_confirmation"] = s.pop("pending_confirmation")
                     break
 
-            # Detect email task from the PROMPT itself — always force confirmation
             email_intent = _parse_email_intent(prompt)
             if email_intent:
                 to_email = email_intent["to"]
                 subject = email_intent["subject"]
                 body = email_intent["body"]
-                # Generate body via LLM — do it when body is empty OR same as subject
                 if not body or body.strip().lower() == subject.strip().lower():
                     try:
                         generated = await asyncio.wait_for(
@@ -373,7 +461,6 @@ class PlannerService:
                 if not body:
                     body = subject or prompt
 
-                # Email confirmation — extract details from prompt (safety: always confirm before sending)
                 logger.info(f"Email task detected — forcing confirmation for: {to_email}")
                 result["pending_confirmation"] = {
                     "type": "email_draft",
@@ -382,7 +469,6 @@ class PlannerService:
                     "body": body,
                 }
 
-            # Detect destructive intent from prompt — always force confirmation
             if "pending_confirmation" not in result and _is_destructive_prompt(prompt):
                 destructive_cmd = prompt.strip()
                 cmd_extract = self._extract_terminal_command(prompt)
@@ -396,9 +482,8 @@ class PlannerService:
                 }
                 logger.info(f"Destructive prompt detected — forcing confirmation: {prompt[:80]}")
 
-            # Detect file write steps — always force confirmation
             if "pending_confirmation" not in result:
-                for s in llm_steps:
+                for s in best_steps:
                     if s.get("agent_type") == "file" and s.get("action") in ("write", "create"):
                         file_path = s.get("parameters", {}).get("path", s.get("parameters", {}).get("filename", "unknown"))
                         result["pending_confirmation"] = {
@@ -417,7 +502,8 @@ class PlannerService:
         rule_steps = rule_result.get("steps", [])
         if rule_steps:
             logger.info(f"Using rule-based plan for prompt: {prompt[:80]}")
-            result = rule_result  # already contains "steps" + optional "pending_confirmation"
+            result = rule_result
+            result["planner_metadata"] = {"planner_source": "rule_based", "quality_score": 0, "fallback_used": True, "local_attempts": metadata["local_attempts"], "cloud_attempts": 0, "validation_errors": []}
             to_email = ""
             subject = ""
             body = ""
@@ -437,8 +523,67 @@ class PlannerService:
                 }
             return result
 
-        # Both failed — return empty
         raise ValueError(f"Could not generate a plan for: {prompt}")
+
+    async def _try_cloud_fallback(self, prompt: str, user_id: Optional[str],
+                                   metadata: Dict[str, Any], best_steps: List[Dict[str, Any]],
+                                   best_validation: Dict[str, Any], min_quality: int,
+                                   provider: str = "openai", model: str = "gpt-4o-mini") -> None:
+        """Attempt cloud API fallback and update metadata in place."""
+        from app.core.config import settings
+        from app.services.credential_store import get_api_key
+        from app.services.cloud_planner import generate_cloud_workflow
+        from app.services.fallback_tracker import record_fallback_usage
+
+        api_key = getattr(settings, "CLOUD_AI_API_KEY", "")
+        if not api_key and user_id:
+            api_key = await get_api_key(user_id, provider) or ""
+
+        if not api_key:
+            logger.warning(f"No API key for cloud fallback (provider={provider})")
+            return
+
+        logger.info(f"Attempting cloud fallback: {provider}/{model}")
+        cloud_result = await generate_cloud_workflow(prompt, api_key, provider, model)
+
+        metadata["cloud_attempts"] = 1
+        if cloud_result.success and cloud_result.workflow:
+            cloud_steps = cloud_result.workflow.get("steps", [])
+            if cloud_steps:
+                from app.services.workflow_validator import WorkflowValidator
+                wf_validator = WorkflowValidator(min_quality_score=min_quality)
+                cloud_validation = wf_validator.validate({"steps": cloud_steps}, prompt)
+                if cloud_validation["score"] > best_validation.get("score", 0):
+                    metadata["planner_source"] = "cloud_fallback"
+                    metadata["quality_score"] = cloud_validation["score"]
+                    metadata["fallback_used"] = True
+                    metadata["validation_errors"] = cloud_validation.get("errors", [])
+                    best_steps.clear()
+                    best_steps.extend(cloud_steps)
+                    best_validation.update(cloud_validation)
+                    logger.info(f"Cloud fallback succeeded: {len(cloud_steps)} steps, quality={cloud_validation['score']}")
+                else:
+                    logger.info(f"Cloud output quality ({cloud_validation['score']}) not better than local ({best_validation.get('score', 0)})")
+            if user_id:
+                await record_fallback_usage(
+                    user_id=user_id, provider=provider, model=model,
+                    fallback_reason="local_quality_low", planner_source="cloud_fallback",
+                    local_attempts=metadata["local_attempts"],
+                    quality_score=best_validation.get("score", 0),
+                    success=True, tokens_input=cloud_result.tokens_input,
+                    tokens_output=cloud_result.tokens_output, latency_ms=cloud_result.latency_ms,
+                )
+        else:
+            logger.warning(f"Cloud fallback failed: {cloud_result.error}")
+            if user_id:
+                await record_fallback_usage(
+                    user_id=user_id, provider=provider, model=model,
+                    fallback_reason="local_quality_low", planner_source="cloud_fallback",
+                    local_attempts=metadata["local_attempts"],
+                    quality_score=best_validation.get("score", 0),
+                    success=False, tokens_input=cloud_result.tokens_input,
+                    tokens_output=cloud_result.tokens_output, latency_ms=cloud_result.latency_ms,
+                )
 
     async def _node_parse_intent(self, state: PlannerState) -> Dict[str, Any]:
         """Resolves raw user prompt into high-level categorization."""

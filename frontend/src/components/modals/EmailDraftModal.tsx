@@ -27,7 +27,7 @@ export function EmailDraftModal({ draft, editedSubject, editedBody, onSubjectCha
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        className="absolute inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
       >
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}

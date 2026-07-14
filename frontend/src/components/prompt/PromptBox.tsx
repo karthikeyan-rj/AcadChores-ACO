@@ -35,8 +35,8 @@ export function PromptBox({ prompt, onPromptChange, onSubmit, loading, disabled 
     <div className="relative">
       <div className={cn(
         'rounded-2xl border transition-all duration-200',
-        prompt ? 'border-primary/30 glow-primary' : 'border-border',
-        'bg-card/80 backdrop-blur-sm'
+        prompt ? 'border-primary/30' : 'border-border',
+        'bg-card'
       )}>
         <div className="flex items-start gap-3 p-4">
           <Sparkles size={18} className="text-primary mt-1 shrink-0" />

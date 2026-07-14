@@ -58,10 +58,11 @@ class OllamaProvider(LLMProvider):
     async def initialize(self) -> None:
         base_url = settings.OLLAMA_BASE_URL or self._cfg.base_url
         model = settings.OLLAMA_MODEL or self._cfg.model
+        timeout_seconds = getattr(settings, "OLLAMA_TIMEOUT_SECONDS", 180)
         self._cfg.base_url = base_url.rstrip("/")
         self._cfg.model = model
-        self._client = httpx.AsyncClient(timeout=120.0)
-        logger.info(f"Ollama provider initialized: {self._cfg.base_url}, model={self._cfg.model}")
+        self._client = httpx.AsyncClient(timeout=float(timeout_seconds))
+        logger.info(f"Ollama provider initialized: {self._cfg.base_url}, model={self._cfg.model}, timeout={timeout_seconds}s")
 
     async def generate(self, request: CompletionRequest) -> CompletionResponse:
         if not self._client:
@@ -191,7 +192,24 @@ class OllamaProvider(LLMProvider):
             if response.status_code == 200:
                 data = response.json()
                 models = data.get("models", [])
-                model_available = any(m["name"].startswith(self._cfg.model.split(":")[0]) for m in models) if models else True
+                model_names = [m.get("name", "") for m in models]
+                model_available = any(
+                    m.get("name", "") == self._cfg.model
+                    for m in models
+                ) if models else False
+                if not model_available and models:
+                    # Also check partial match (without tag)
+                    base_model = self._cfg.model.split(":")[0]
+                    model_available = any(
+                        m.get("name", "").startswith(base_model)
+                        for m in models
+                    )
+                if not model_available and models:
+                    logger.warning(
+                        f"Required model '{self._cfg.model}' not found. "
+                        f"Available models: {model_names}. "
+                        f"Run: ollama pull {self._cfg.model}"
+                    )
                 return ProviderHealth(
                     available=True,
                     provider=self.name,
@@ -209,7 +227,9 @@ class OllamaProvider(LLMProvider):
             return ProviderHealth(
                 available=False,
                 provider=self.name,
-                error=str(e),
+                error=f"Unable to connect to Ollama at {self._cfg.base_url}. "
+                      f"Ensure Ollama is running and {self._cfg.model} is installed. "
+                      f"Error: {e}",
             )
 
     async def list_models(self) -> List[ModelInfo]:

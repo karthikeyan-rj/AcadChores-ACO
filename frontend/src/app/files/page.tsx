@@ -102,10 +102,10 @@ export default function FilesPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="h-12 border-b border-border flex items-center justify-between px-4 shrink-0 bg-card/50">
+      <div className="h-12 border-b border-border flex items-center justify-between px-4 shrink-0 bg-surface">
         <div className="flex items-center gap-2">
           <div className={cn(
-            'flex bg-surface border border-border rounded-lg p-0.5'
+            'flex bg-surface-2 border border-border rounded-md p-0.5'
           )}>
             <button
               onClick={() => setTab('search')}
@@ -130,7 +130,7 @@ export default function FilesPage() {
                 placeholder="Search your indexed files..."
                 value={searchInput}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition"
+                className="w-full pl-9 pr-4 py-1.5 text-xs bg-surface-2 border border-border rounded-md outline-none focus:border-primary transition"
               />
               {searchLoading && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary" />}
             </div>
@@ -138,13 +138,13 @@ export default function FilesPage() {
           {tab === 'index' && (
             <div className="flex items-center gap-2">
               <button onClick={() => { refreshConfig(); refreshJobs(); refreshStats(); }}
-                className="p-1.5 rounded-lg hover:bg-surface-2 transition text-gray-400 hover:text-foreground cursor-pointer" title="Refresh">
+                className="p-1.5 rounded-md hover:bg-surface-2 transition text-gray-400 hover:text-foreground cursor-pointer" title="Refresh">
                 <RefreshCw size={14} />
               </button>
               <button
                 onClick={handleTrigger}
                 disabled={trigerring || !!runningJob || !config?.enabled}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium hover:bg-primary-hover transition disabled:opacity-40 cursor-pointer"
               >
                 {trigerring || runningJob ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                 {runningJob ? 'Indexing...' : 'Run Now'}
@@ -223,13 +223,13 @@ export default function FilesPage() {
                 return (
                   <motion.div
                     key={item.file_path || i}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.03 }}
                     onClick={() => { setSelected(item.file_path); setPreview(item); }}
                     className={cn(
                       'flex flex-col items-center gap-2 p-4 rounded-xl border cursor-pointer transition-all',
-                      selected === item.file_path ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-border-light hover:bg-card-hover'
+                      selected === item.file_path ? 'border-primary/40 bg-primary/5' : 'border-border bg-card hover:bg-card-hover'
                     )}
                   >
                     <Icon size={28} className="text-gray-400" />
@@ -246,21 +246,21 @@ export default function FilesPage() {
             {/* Stats */}
             {!statsLoading && stats && (
               <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-xl border border-border bg-card/80 p-4 space-y-2">
+                <div className="rounded-xl border border-border bg-card p-4 space-y-2">
                   <div className="flex items-center gap-2 text-gray-400">
                     <FileText size={14} />
                     <span className="text-xs font-medium">Total Files</span>
                   </div>
                   <p className="text-2xl font-bold">{stats.total_files || 0}</p>
                 </div>
-                <div className="rounded-xl border border-border bg-card/80 p-4 space-y-2">
+                <div className="rounded-xl border border-border bg-card p-4 space-y-2">
                   <div className="flex items-center gap-2 text-gray-400">
                     <HardDrive size={14} />
                     <span className="text-xs font-medium">Total Size</span>
                   </div>
                   <p className="text-2xl font-bold">{formatSize(stats.total_size_bytes || 0)}</p>
                 </div>
-                <div className="rounded-xl border border-border bg-card/80 p-4 space-y-2">
+                <div className="rounded-xl border border-border bg-card p-4 space-y-2">
                   <div className="flex items-center gap-2 text-gray-400">
                     <Database size={14} />
                     <span className="text-xs font-medium">Extensions</span>
@@ -272,7 +272,7 @@ export default function FilesPage() {
 
             {/* Top Extensions */}
             {!statsLoading && stats?.top_extensions?.length > 0 && (
-              <div className="rounded-xl border border-border bg-card/80 p-5 space-y-3">
+              <div className="rounded-xl border border-border bg-card p-5 space-y-3">
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Top File Types</span>
                 <div className="space-y-2">
                   {stats.top_extensions.slice(0, 5).map((ext: any, i: number) => (
@@ -289,7 +289,7 @@ export default function FilesPage() {
             )}
 
             {/* Configuration */}
-            <div className="rounded-xl border border-border bg-card/80 p-5 space-y-5">
+            <div className="rounded-xl border border-border bg-card p-5 space-y-5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Index Configuration</span>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -312,9 +312,9 @@ export default function FilesPage() {
                       value={root}
                       onChange={(e) => updateRoot(i, e.target.value)}
                       placeholder="C:\Users\you\Documents"
-                      className="flex-1 px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition font-mono"
+                      className="flex-1 px-3 py-2 text-xs bg-surface-2 border border-border rounded-md outline-none focus:border-primary transition font-mono"
                     />
-                    <button onClick={() => removeRoot(i)} className="p-1.5 rounded-lg hover:bg-surface-2 text-gray-500 hover:text-danger transition cursor-pointer">
+                    <button onClick={() => removeRoot(i)} className="p-1.5 rounded-md hover:bg-surface-2 text-gray-500 hover:text-danger transition cursor-pointer">
                       <Trash2 size={12} />
                     </button>
                   </div>
@@ -333,7 +333,7 @@ export default function FilesPage() {
                     min={1}
                     value={configForm.max_file_size_mb}
                     onChange={(e) => setConfigForm(p => ({ ...p, max_file_size_mb: parseInt(e.target.value) || 100 }))}
-                    className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition"
+                    className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-md outline-none focus:border-primary transition"
                   />
                 </div>
                 <div className="space-y-1">
@@ -343,7 +343,7 @@ export default function FilesPage() {
                     min={60}
                     value={configForm.interval_seconds}
                     onChange={(e) => setConfigForm(p => ({ ...p, interval_seconds: parseInt(e.target.value) || 3600 }))}
-                    className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition"
+                    className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-md outline-none focus:border-primary transition"
                   />
                 </div>
               </div>
@@ -354,7 +354,7 @@ export default function FilesPage() {
                 <input
                   value={configForm.exclude_extensions}
                   onChange={(e) => setConfigForm(p => ({ ...p, exclude_extensions: e.target.value }))}
-                  className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition font-mono"
+                  className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-md outline-none focus:border-primary transition font-mono"
                 />
               </div>
               <div className="space-y-1">
@@ -362,14 +362,14 @@ export default function FilesPage() {
                 <input
                   value={configForm.exclude_dirs}
                   onChange={(e) => setConfigForm(p => ({ ...p, exclude_dirs: e.target.value }))}
-                  className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition font-mono"
+                  className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-md outline-none focus:border-primary transition font-mono"
                 />
               </div>
 
               <button
                 onClick={handleSaveConfig}
                 disabled={saving || configForm.roots.filter(r => r.trim()).length === 0}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white text-xs font-medium hover:bg-primary-hover transition disabled:opacity-40 cursor-pointer"
               >
                 {saving ? <Loader2 size={12} className="animate-spin" /> : <Settings size={12} />}
                 Save Configuration
@@ -377,7 +377,7 @@ export default function FilesPage() {
             </div>
 
             {/* Recent Jobs */}
-            <div className="rounded-xl border border-border bg-card/80 overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3 border-b border-border">
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Indexing Jobs</span>
                 <button onClick={refreshJobs} className="text-[10px] text-primary hover:underline cursor-pointer">Refresh</button>
@@ -446,7 +446,7 @@ export default function FilesPage() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="border-t border-border bg-card/80 overflow-hidden"
+            className="border-t border-border bg-card overflow-hidden"
           >
             <div className="flex items-center justify-between px-4 py-2">
               <div className="flex items-center gap-2 min-w-0">

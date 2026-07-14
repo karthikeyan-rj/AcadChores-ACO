@@ -131,7 +131,7 @@ export default function ChatPage() {
       setPrompt('');
       setChatLoading(true);
       try {
-        const res = await api.chat(userMsg);
+        const res = await api.chat(userMsg, token);
         const replyTime = new Date().toLocaleTimeString();
         setChatHistory(prev => [...prev, { role: 'assistant', content: res.reply, time: replyTime }]);
       } catch (e: any) {
@@ -148,7 +148,7 @@ export default function ChatPage() {
     addLog(t, `Analyzing: "${userMsg.substring(0, 40)}..."`, 'info');
 
     try {
-      const planData = await api.generatePlan(userMsg);
+      const planData = await api.generatePlan(userMsg, token!);
       setPlan(planData.steps);
       addLog(t, `Generated ${planData.steps.length} steps.`, 'info');
 
@@ -203,7 +203,6 @@ export default function ChatPage() {
 
   const handlePerm = async (ok: boolean) => {
     if (!perm) { console.error('[PERM] handlePerm called but perm is null'); return; }
-    console.log(`[PERM] User clicked ${ok ? 'Allow' : 'Block'} for request_id=${perm.request_id}, token=${token ? token.substring(0, 20) + '...' : 'NULL'}`);
     try {
       const res = await api.respondPermission(perm.request_id, ok, token!);
       console.log('[PERM] API response:', res);
@@ -243,8 +242,12 @@ export default function ChatPage() {
     <div className="h-full flex flex-col lg:flex-row overflow-hidden">
       {/* Left: Prompt + Graph + Result */}
       <div className="flex-1 flex flex-col overflow-y-auto p-6 space-y-5 min-w-0">
+
         {/* Prompt Box */}
-        <div className={cn('rounded-2xl border transition-all duration-200 bg-card/80 backdrop-blur-sm', prompt ? 'border-primary/30 glow-primary' : 'border-border')}>
+        <div className={cn(
+          'rounded-xl border transition-colors duration-200 bg-card',
+          prompt ? 'border-primary/30' : 'border-border'
+        )}>
           <div className="flex items-start gap-3 p-4">
             <Sparkles size={18} className="text-primary mt-1 shrink-0" />
             <textarea
@@ -259,12 +262,17 @@ export default function ChatPage() {
           </div>
           <div className="flex items-center justify-between px-4 pb-3">
             <div className="flex items-center gap-1">
-              <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer" title="Attach file"><Paperclip size={14} /></button>
-              <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer" title="Voice input"><Mic size={14} /></button>
-              <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer" title="Screenshot"><Camera size={14} /></button>
+              <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface transition-colors cursor-pointer" title="Attach file"><Paperclip size={14} /></button>
+              <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface transition-colors cursor-pointer" title="Voice input"><Mic size={14} /></button>
+              <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface transition-colors cursor-pointer" title="Screenshot"><Camera size={14} /></button>
             </div>
             <button onClick={handleSubmit} disabled={!connected || !prompt.trim() || isRunning}
-              className={cn('flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all', prompt.trim() && !isRunning ? 'bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/20 cursor-pointer' : 'bg-surface-2 text-gray-600 cursor-not-allowed')}>
+              className={cn(
+                'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors',
+                prompt.trim() && !isRunning
+                  ? 'bg-primary hover:bg-primary-hover text-white cursor-pointer'
+                  : 'bg-surface text-gray-600 cursor-not-allowed'
+              )}>
               {isRunning ? <Loader2 size={13} className="animate-spin" /> : <><span>Execute</span><Play size={12} className="fill-current" /></>}
             </button>
           </div>
@@ -276,9 +284,9 @@ export default function ChatPage() {
             {chatHistory.map((msg, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
                 className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                <div className={cn('max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+                <div className={cn('max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed',
                   msg.role === 'user'
-                    ? 'bg-primary/15 text-foreground border border-primary/20'
+                    ? 'bg-primary/10 text-foreground border border-primary/20'
                     : 'bg-card border border-border text-foreground')}>
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                   <p className="text-[9px] text-gray-600 mt-1.5">{msg.time}</p>
@@ -287,7 +295,7 @@ export default function ChatPage() {
             ))}
             {chatLoading && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                <div className="bg-card border border-border rounded-2xl px-4 py-3 text-sm text-gray-500">
+                <div className="bg-card border border-border rounded-xl px-4 py-3 text-sm text-gray-500">
                   <Loader2 size={14} className="animate-spin inline mr-2" />Thinking...
                 </div>
               </motion.div>
@@ -295,7 +303,7 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Result — immediately below the chat input */}
+        {/* Result */}
         <AnimatePresence mode="wait">
           {result && (
             <motion.div
@@ -313,7 +321,6 @@ export default function ChatPage() {
         {/* Suggestions (when idle) */}
         {plan.length === 0 && status === 'Idle' && (
           <div className="space-y-3">
-            {/* Suggestion chips */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles size={12} className="text-gray-500" />
@@ -322,7 +329,7 @@ export default function ChatPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {suggestions.map((s, i) => (
                   <motion.button key={i} whileHover={{ x: 2 }} onClick={() => setPrompt(s.text)}
-                    className="text-left text-xs text-gray-400 hover:text-foreground p-3 rounded-lg border border-border hover:border-border-light hover:bg-card transition cursor-pointer flex items-center gap-2 group">
+                    className="text-left text-xs text-gray-400 hover:text-foreground p-3 rounded-lg border border-border hover:border-border-light hover:bg-card transition-colors cursor-pointer flex items-center gap-2 group">
                     <span className="text-sm shrink-0">{s.icon}</span>
                     <div className="flex-1 min-w-0">
                       <p className="truncate">{s.text}</p>
@@ -362,16 +369,16 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Browser Preview Placeholder */}
+        {/* Browser Preview */}
         {plan.length > 0 && isRunning && (
-          <div className="rounded-xl border border-border bg-card/80 overflow-hidden">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
               <div className="flex items-center gap-2">
                 <MonitorPlay size={13} className="text-primary" />
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Browser Preview</span>
               </div>
               <div className="flex items-center gap-1">
-                <button className="p-1 rounded hover:bg-surface-2 cursor-pointer" title="Fullscreen"><Maximize2 size={11} className="text-gray-500" /></button>
+                <button className="p-1 rounded hover:bg-surface cursor-pointer" title="Fullscreen"><Maximize2 size={11} className="text-gray-500" /></button>
               </div>
             </div>
             <div className="h-[200px] flex items-center justify-center bg-surface">
@@ -387,7 +394,7 @@ export default function ChatPage() {
       </div>
 
       {/* Right: Console + Timeline */}
-      <div className="w-full lg:w-[380px] border-t lg:border-t-0 lg:border-l border-border flex flex-col shrink-0 bg-surface/50">
+      <div className="w-full lg:w-[380px] border-t lg:border-t-0 lg:border-l border-border flex flex-col shrink-0 bg-surface">
         <div className="flex-1 p-3 min-h-0 min-h-[300px]">
           <LiveConsole logs={logs} wsConnected={wsUp} />
         </div>

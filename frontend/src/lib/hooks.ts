@@ -15,21 +15,79 @@ export function useBackendHealth() {
   return connected;
 }
 
+const WS_MAX_RECONNECT_ATTEMPTS = 5;
+const WS_BASE_DELAY_MS = 1000;
+const WS_MAX_DELAY_MS = 30000;
+
 export function useWebSocket(executionId: string | null) {
   const { token } = useAuth();
   const [connected, setConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<any>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttempts = useRef(0);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
 
-  useEffect(() => {
-    if (!executionId) return;
+  const cleanup = useCallback(() => {
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+    if (wsRef.current) {
+      const ws = wsRef.current;
+      wsRef.current = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onopen = null;
+      ws.onmessage = null;
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close(1000, 'cleanup');
+      }
+    }
+  }, []);
+
+  const connect = useCallback(() => {
+    cleanup();
+    if (!executionId || !token || unmountedRef.current) return;
+
     const ws = new WebSocket(api.wsUrl(executionId, token));
     wsRef.current = ws;
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onmessage = (e) => setLastEvent(JSON.parse(e.data));
-    return () => { ws.close(); wsRef.current = null; };
-  }, [executionId, token]);
+
+    ws.onopen = () => {
+      setConnected(true);
+      reconnectAttempts.current = 0;
+    };
+
+    ws.onclose = (event) => {
+      setConnected(false);
+      wsRef.current = null;
+      if (unmountedRef.current) return;
+      if (!token || event.code === 1000 || event.code === 4001 || event.code === 4003) return;
+      if (reconnectAttempts.current >= WS_MAX_RECONNECT_ATTEMPTS) return;
+      const delay = Math.min(
+        WS_BASE_DELAY_MS * Math.pow(2, reconnectAttempts.current),
+        WS_MAX_DELAY_MS
+      );
+      reconnectAttempts.current += 1;
+      reconnectTimer.current = setTimeout(connect, delay);
+    };
+
+    ws.onerror = () => {};
+
+    ws.onmessage = (e) => {
+      try { setLastEvent(JSON.parse(e.data)); } catch {}
+    };
+  }, [executionId, token, cleanup]);
+
+  useEffect(() => {
+    unmountedRef.current = false;
+    reconnectAttempts.current = 0;
+    connect();
+    return () => {
+      unmountedRef.current = true;
+      cleanup();
+    };
+  }, [connect, cleanup]);
 
   return { connected, lastEvent };
 }

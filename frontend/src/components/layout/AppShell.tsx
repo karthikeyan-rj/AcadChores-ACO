@@ -4,17 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MessageSquare, GitBranch, History, FileText, Database, BarChart3,
-  Puzzle, Clock, Settings, HelpCircle, LayoutDashboard, PanelLeftClose,
-  PanelLeft, LogOut, Search, Bell, ChevronDown, Cpu, Globe, Wifi,
-  Database as DbIcon, Terminal, HardDrive, Activity, Layers, Shield,
-  Moon, Sun, Keyboard, User
+  MessageSquare, GitBranch, History, FileText, BarChart3,
+  Settings, LayoutDashboard, PanelLeftClose,
+  PanelLeft, LogOut, Search, ChevronDown, Cpu, Globe, Wifi,
+  Database as DbIcon, Layers, User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useBackendHealth } from '@/lib/hooks';
 import { CommandPalette } from '@/components/modals/CommandPalette';
-import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 
 const navItems = [
   { id: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -22,12 +20,8 @@ const navItems = [
   { id: '/workflows', icon: GitBranch, label: 'Workflows' },
   { id: '/history', icon: History, label: 'History' },
   { id: '/files', icon: FileText, label: 'Files' },
-  { id: '/memory', icon: Database, label: 'Memory' },
   { id: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { id: '/plugins', icon: Puzzle, label: 'Plugins' },
-  { id: '/scheduler', icon: Clock, label: 'Scheduler' },
   { id: '/settings', icon: Settings, label: 'Settings' },
-  { id: '/help', icon: HelpCircle, label: 'Help' },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -37,11 +31,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const backendConnected = useBackendHealth();
   const [collapsed, setCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  // IMPORTANT: All hooks MUST be called before any conditional returns.
-  // Restore sidebar state from localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('aco-sidebar-collapsed');
@@ -49,34 +41,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !user && pathname !== '/login' && pathname !== '/') {
       router.replace('/login');
     }
   }, [user, authLoading, pathname, router]);
 
-  // Save sidebar state
   useEffect(() => {
     try {
       localStorage.setItem('aco-sidebar-collapsed', String(collapsed));
     } catch {}
   }, [collapsed]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(p => !p); }
       if ((e.ctrlKey || e.metaKey) && e.key === '/') { e.preventDefault(); setCollapsed(p => !p); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); router.push('/chat'); }
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); router.push('/settings'); }
-      if (e.key === 'Escape') { setProfileOpen(false); setNotifOpen(false); setCmdOpen(false); }
+      if (e.key === 'Escape') { setProfileOpen(false); setCmdOpen(false); setMobileOpen(false); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [router]);
 
-  // Close profile dropdown on outside click
   useEffect(() => {
     if (!profileOpen) return;
     const handler = () => setProfileOpen(false);
@@ -84,97 +72,100 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('click', handler);
   }, [profileOpen]);
 
-  // === CONDITIONAL RENDERS (after all hooks) ===
+  // Close mobile sidebar on route change
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  // Landing page and login — render without shell
   if (pathname === '/' || pathname === '/login') {
     return <>{children}</>;
   }
 
-  // Loading state — show nothing until auth is resolved
   if (authLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center animate-pulse">
-            <Cpu size={20} className="text-primary" />
+          <div className="w-9 h-9 rounded-lg bg-surface-2 flex items-center justify-center">
+            <Cpu size={18} className="text-primary" />
           </div>
-          <span className="text-xs text-gray-500">Loading ACO...</span>
+          <span className="text-xs text-gray-500">Loading...</span>
         </div>
       </div>
     );
   }
 
-  // Not authenticated — show nothing (redirect is happening via useEffect)
-  if (!user) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center animate-pulse">
-            <Cpu size={20} className="text-primary" />
-          </div>
-          <span className="text-xs text-gray-500">Redirecting to login...</span>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
+
+  const sidebarWidth = collapsed ? 56 : 200;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(s) => { router.push(s); }} />
-      <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
+
+      {/* Mobile overlay */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Sidebar */}
-      <motion.aside
-        animate={{ width: collapsed ? 60 : 220 }}
-        transition={{ duration: 0.2, ease: 'easeInOut' }}
-        className="h-full border-r border-border bg-card/50 backdrop-blur-xl flex flex-col no-select shrink-0 relative z-40"
+      <aside
+        className={cn(
+          'h-full border-r border-border bg-surface flex flex-col no-select shrink-0 z-50',
+          'fixed lg:relative transition-transform duration-200 ease-out',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        )}
+        style={{ width: sidebarWidth }}
       >
         {/* Logo */}
         <div className="h-12 flex items-center px-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-              <Cpu size={16} className="text-primary" />
+            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+              <Cpu size={14} className="text-primary" />
             </div>
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden">
-                  <span className="font-bold text-sm whitespace-nowrap">ACO</span>
-                  <span className="text-[9px] text-gray-500 ml-1.5 whitespace-nowrap">v1.0</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <span className="font-semibold text-[13px] whitespace-nowrap text-foreground">ACO</span>
+                <span className="text-[9px] text-gray-600 ml-1.5 whitespace-nowrap">v1.0</span>
+              </div>
+            )}
           </div>
         </div>
 
-        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        {/* Nav */}
+        <nav className="flex-1 py-2 px-1.5 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.id || (item.id !== '/' && pathname.startsWith(item.id));
             return (
               <button
                 key={item.id}
-                onClick={() => router.push(item.id)}
+                onClick={() => { router.push(item.id); setMobileOpen(false); }}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  'w-full flex items-center gap-3 rounded-lg transition-all duration-150 cursor-pointer group relative',
-                  collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2',
+                  'w-full flex items-center gap-2.5 rounded-md transition-all duration-150 cursor-pointer group relative',
+                  collapsed ? 'justify-center px-2 py-2' : 'px-2.5 py-1.5',
                   isActive
-                    ? 'bg-primary/10 text-primary border border-primary/20'
-                    : 'text-gray-400 hover:text-foreground hover:bg-surface-2 border border-transparent'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-gray-500 hover:text-foreground hover:bg-surface-2'
                 )}
               >
-                <Icon size={16} className={cn('shrink-0', isActive && 'text-primary')} />
-                <AnimatePresence>
-                  {!collapsed && (
-                    <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="text-xs font-medium truncate overflow-hidden whitespace-nowrap">
-                      {item.label}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-                {isActive && <motion.div layoutId="sidebar-indicator" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r bg-primary" />}
+                <Icon size={15} className={cn('shrink-0', isActive && 'text-primary')} />
+                {!collapsed && (
+                  <span className="text-[12px] font-medium truncate whitespace-nowrap">
+                    {item.label}
+                  </span>
+                )}
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-3.5 rounded-r bg-primary" />
+                )}
                 {collapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-surface-3 border border-border text-xs text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+                  <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-surface-3 border border-border text-[11px] text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
                     {item.label}
                   </div>
                 )}
@@ -183,104 +174,107 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="border-t border-border p-2 space-y-1">
+        {/* Bottom */}
+        <div className="border-t border-border p-1.5 space-y-0.5">
           <button
             onClick={() => setCollapsed(p => !p)}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-foreground hover:bg-surface-2 transition cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs whitespace-nowrap">Collapse</motion.span>
-              )}
-            </AnimatePresence>
+            {collapsed ? <PanelLeft size={15} /> : <PanelLeftClose size={15} />}
+            {!collapsed && <span className="text-[12px] whitespace-nowrap">Collapse</span>}
           </button>
 
-          {/* User pill */}
+          {/* User */}
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setProfileOpen(p => !p); }}
               className={cn(
-                'w-full flex items-center gap-2 rounded-lg bg-surface transition cursor-pointer',
-                collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'
+                'w-full flex items-center gap-2 rounded-md bg-surface-2 transition cursor-pointer',
+                collapsed ? 'justify-center px-2 py-1.5' : 'px-2.5 py-1.5'
               )}
             >
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full shrink-0" />
+                <img src={user.avatar_url} alt="" className="w-5 h-5 rounded-full shrink-0" />
               ) : (
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-bold shrink-0">
+                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-primary text-[9px] font-bold shrink-0">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <AnimatePresence>
-                {!collapsed && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0 text-left">
-                    <p className="text-[11px] font-medium truncate">{user.name}</p>
-                    <p className="text-[9px] text-gray-500 truncate">{user.email}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              {!collapsed && <ChevronDown size={12} className="text-gray-500 shrink-0" />}
+              {!collapsed && (
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-[11px] font-medium truncate text-foreground">{user.name}</p>
+                  <p className="text-[9px] text-gray-600 truncate">{user.email}</p>
+                </div>
+              )}
+              {!collapsed && <ChevronDown size={11} className="text-gray-600 shrink-0" />}
             </button>
 
             <AnimatePresence>
               {profileOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 4, scale: 0.96 }}
-                  className="absolute bottom-full left-0 right-0 mb-1 rounded-xl border border-border bg-card shadow-2xl overflow-hidden z-50"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-border bg-card shadow-xl overflow-hidden z-50"
                 >
-                  <div className="p-1">
-                    <ProfileMenuItem icon={<User size={13} />} label="Profile" onClick={() => { router.push('/settings'); setProfileOpen(false); }} />
-                    <ProfileMenuItem icon={<Settings size={13} />} label="Settings" onClick={() => { router.push('/settings'); setProfileOpen(false); }} />
-                    <ProfileMenuItem icon={<Moon size={13} />} label="Theme" onClick={() => setProfileOpen(false)} />
-                    <ProfileMenuItem icon={<Keyboard size={13} />} label="Shortcuts" onClick={() => { router.push('/help'); setProfileOpen(false); }} />
-                    <ProfileMenuItem icon={<HelpCircle size={13} />} label="About" onClick={() => { router.push('/help'); setProfileOpen(false); }} />
+                  <div className="p-0.5">
+                    <button
+                      onClick={() => { router.push('/settings'); setProfileOpen(false); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] text-gray-400 hover:text-foreground hover:bg-surface-2 transition cursor-pointer"
+                    >
+                      <User size={12} />Settings
+                    </button>
                   </div>
-                  <div className="border-t border-border p-1">
-                    <ProfileMenuItem icon={<LogOut size={13} />} label="Sign Out" danger onClick={() => { logout(); router.replace('/login'); setProfileOpen(false); }} />
+                  <div className="border-t border-border p-0.5">
+                    <button
+                      onClick={() => { logout(); router.replace('/login'); setProfileOpen(false); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] text-danger hover:bg-danger/5 transition cursor-pointer"
+                    >
+                      <LogOut size={12} />Sign Out
+                    </button>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top Nav */}
-        <header className="h-12 border-b border-border bg-card/50 backdrop-blur-xl flex items-center justify-between px-4 no-select shrink-0">
+        {/* Top bar */}
+        <header className="h-11 border-b border-border bg-surface flex items-center justify-between px-4 no-select shrink-0">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setCmdOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border text-gray-500 text-xs hover:border-border-light hover:text-gray-400 transition cursor-pointer w-[240px]"
+              onClick={() => setMobileOpen(p => !p)}
+              className="lg:hidden p-1 rounded-md hover:bg-surface-2 transition text-gray-400 cursor-pointer"
             >
-              <Search size={12} />
-              <span>Search or type a command...</span>
-              <kbd className="ml-auto text-[10px] bg-surface-2 px-1.5 py-0.5 rounded border border-border font-mono">Ctrl+K</kbd>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setCmdOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-2 border border-border text-gray-500 text-[11px] hover:border-border-light hover:text-gray-400 transition cursor-pointer w-[220px]"
+            >
+              <Search size={11} />
+              <span>Search or command...</span>
+              <kbd className="ml-auto text-[9px] bg-surface-3 px-1.5 py-0.5 rounded border border-border font-mono text-gray-600">Ctrl+K</kbd>
             </button>
           </div>
-          <div className="flex items-center gap-1">
-            <StatusPill icon={<DbIcon size={10} />} label="Mongo" active={backendConnected} />
-            <StatusPill icon={<Wifi size={10} />} label="Redis" active={backendConnected} />
-            <StatusPill icon={<Globe size={10} />} label="Browser" active={backendConnected} />
-            <div className="h-4 w-px bg-border mx-1.5" />
-            <button
-              onClick={() => setNotifOpen(p => !p)}
-              className="p-1.5 rounded-lg hover:bg-surface-2 transition text-gray-400 hover:text-foreground cursor-pointer relative"
-            >
-              <Bell size={15} />
-              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-            </button>
+          <div className="flex items-center gap-2">
+            <StatusPill icon={<DbIcon size={9} />} label="Mongo" active={backendConnected} />
+            <StatusPill icon={<Wifi size={9} />} label="Redis" active={backendConnected} />
+            <StatusPill icon={<Globe size={9} />} label="Browser" active={backendConnected} />
+            <div className="h-3.5 w-px bg-border mx-1" />
             <button
               onClick={() => router.push('/settings')}
-              className="p-1.5 rounded-lg hover:bg-surface-2 transition text-gray-400 hover:text-foreground cursor-pointer"
-              title="Settings (Ctrl+,)"
+              className="p-1.5 rounded-md hover:bg-surface-2 transition text-gray-500 hover:text-foreground cursor-pointer"
+              title="Settings"
             >
-              <Settings size={15} />
+              <Settings size={14} />
             </button>
           </div>
         </header>
@@ -290,10 +284,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               className="h-full"
             >
               {children}
@@ -301,17 +295,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </main>
 
-        {/* Status Bar */}
-        <footer className="h-6 border-t border-border bg-card/30 backdrop-blur-xl flex items-center justify-between px-4 no-select text-[10px] text-gray-500 shrink-0">
+        {/* Status bar */}
+        <footer className="h-6 border-t border-border bg-surface flex items-center justify-between px-4 no-select text-[10px] text-gray-600 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1"><span className={cn('h-1 w-1 rounded-full', backendConnected ? 'bg-accent' : 'bg-danger')} />Backend</span>
+            <span className="flex items-center gap-1">
+              <span className={cn('h-1 w-1 rounded-full', backendConnected ? 'bg-accent' : 'bg-danger')} />
+              Backend
+            </span>
             <span className="flex items-center gap-1"><span className="h-1 w-1 rounded-full bg-accent" />Mongo</span>
-            <span className="flex items-center gap-1"><span className="h-1 w-1 rounded-full bg-accent" />Redis</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-gray-600">Host: Windows Native</span>
-            <span className="flex items-center gap-1"><Layers size={10} />3 Workers</span>
-            <span className="flex items-center gap-1"><Cpu size={10} />Ollama</span>
+            <span>Windows Native</span>
+            <span className="flex items-center gap-1"><Layers size={9} />3 Workers</span>
+            <span className="flex items-center gap-1"><Cpu size={9} />Ollama</span>
           </div>
         </footer>
       </div>
@@ -321,24 +317,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 function StatusPill({ icon, label, active }: { icon: React.ReactNode; label: string; active: boolean }) {
   return (
-    <span className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px]" title={label}>
-      <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-accent' : 'bg-gray-600')} />
+    <span className="hidden lg:flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px]" title={label}>
+      <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-accent' : 'bg-gray-700')} />
       <span className={active ? 'text-gray-400' : 'text-gray-600'}>{label}</span>
     </span>
-  );
-}
-
-function ProfileMenuItem({ icon, label, onClick, danger = false }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition cursor-pointer',
-        danger ? 'text-danger hover:bg-danger/5' : 'text-gray-400 hover:text-foreground hover:bg-surface-2'
-      )}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }

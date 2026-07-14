@@ -17,6 +17,22 @@ logger = logging.getLogger(__name__)
 _in_memory_task_queue: asyncio.Queue = asyncio.Queue()
 _in_memory_task_statuses: Dict[str, Dict[str, str]] = {}
 
+# Maximum time a single task can run before being cancelled (5 minutes)
+TASK_EXECUTION_TIMEOUT: float = 300.0
+
+# Maximum in-memory task entries before cleanup
+_MAX_IN_MEMORY_TASKS = 500
+
+
+def _cleanup_task_statuses():
+    """Evict oldest completed/failed task statuses if dict grows too large."""
+    if len(_in_memory_task_statuses) > _MAX_IN_MEMORY_TASKS:
+        keys = list(_in_memory_task_statuses.keys())
+        for k in keys[: len(keys) // 2]:
+            status = _in_memory_task_statuses.get(k, {}).get("status", "")
+            if status in ("completed", "failed"):
+                _in_memory_task_statuses.pop(k, None)
+
 class TaskQueue:
     @staticmethod
     async def enqueue(execution_id: str, step_data: Dict[str, Any]) -> str:
@@ -167,7 +183,26 @@ class WorkerPool:
                 )
 
             logger.info(f"Worker-{worker_id}: About to execute step {step_data}")
-            result = await self.agent_manager.execute_step(step_data, progress_callback, user_id=step_data.get("user_id"))
+            try:
+                result = await asyncio.wait_for(
+                    self.agent_manager.execute_step(step_data, progress_callback, user_id=step_data.get("user_id")),
+                    timeout=TASK_EXECUTION_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                error_msg = f"Task execution timed out after {TASK_EXECUTION_TIMEOUT}s"
+                logger.error(f"Worker-{worker_id}: {error_msg} for task {task_id}")
+                failed_mapping = {"status": "failed", "error": error_msg}
+                if redis:
+                    await redis.hset(f"task:status:{task_id}", mapping=failed_mapping)
+                else:
+                    if task_id in _in_memory_task_statuses:
+                        _in_memory_task_statuses[task_id].update(failed_mapping)
+                await event_bus.publish(
+                    topic="task.failed",
+                    sender=f"Worker-{worker_id}",
+                    payload={"task_id": task_id, "execution_id": execution_id, "error": error_msg, "step_data": step_data},
+                )
+                return
             logger.info(f"Worker-{worker_id}: Step executed OK. Result={result}")
 
             # --- Verification Phase ---
@@ -227,6 +262,7 @@ class WorkerPool:
                 )
                 logger.info(f"Worker-{worker_id}: Published verification.failed for task {task_id}, execution {execution_id}")
             logger.info(f"Worker-{worker_id} successfully completed task {task_id}")
+            _cleanup_task_statuses()
 
         except Exception as e:
             tb = traceback.format_exc()

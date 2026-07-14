@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { History, Search, LayoutGrid, List, Table as TableIcon, Clock, CheckCircle2, XCircle, Download, Loader2, ChevronLeft, ChevronRight, RotateCcw, Copy, Eye } from 'lucide-react';
+import { History, Search, LayoutGrid, List, Table as TableIcon, Clock, CheckCircle2, Download, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { cn, formatRelativeTime, formatDuration, statusColor } from '@/lib/utils';
 import { useExecutions } from '@/lib/hooks';
 import { SkeletonTable, SkeletonList } from '@/components/ui/Skeleton';
@@ -63,7 +63,7 @@ export default function HistoryPage() {
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} executions{filter !== 'All' ? ` (${filter})` : ''}</p>
         </div>
         <button onClick={handleExport} disabled={filtered.length === 0}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border text-xs text-gray-400 hover:text-foreground transition cursor-pointer disabled:opacity-50">
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-gray-400 hover:text-foreground transition cursor-pointer disabled:opacity-50">
           <Download size={13} />Export CSV
         </button>
       </div>
@@ -72,18 +72,18 @@ export default function HistoryPage() {
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input type="text" placeholder="Search history..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs bg-card border border-border rounded-lg outline-none focus:border-primary transition" />
+            className="w-full pl-9 pr-4 py-2 text-xs bg-surface-2 border border-border rounded-lg outline-none focus:border-primary transition" />
         </div>
         <div className="flex gap-1">
           {filters.map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={cn('px-3 py-1.5 rounded-lg text-[11px] font-medium transition cursor-pointer border',
-                filter === f ? 'bg-primary/10 text-primary border-primary/30' : 'bg-card border-border text-gray-400 hover:text-foreground')}>
+                filter === f ? 'bg-primary/10 text-primary border-primary/30' : 'bg-surface-2 border-border text-gray-400 hover:text-foreground')}>
               {f}
             </button>
           ))}
         </div>
-        <div className="flex gap-0.5 bg-card border border-border rounded-lg p-0.5">
+        <div className="flex gap-0.5 bg-surface-2 border border-border rounded-lg p-0.5">
           {([['cards', LayoutGrid], ['timeline', List], ['table', TableIcon]] as [ViewMode, any][]).map(([v, Icon]) => (
             <button key={v} onClick={() => setView(v)}
               className={cn('p-1.5 rounded-md transition cursor-pointer', view === v ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:text-foreground')}>
@@ -116,7 +116,6 @@ export default function HistoryPage() {
               <th className="text-left px-4 py-2.5 font-medium">Steps</th>
               <th className="text-left px-4 py-2.5 font-medium">Duration</th>
               <th className="text-left px-4 py-2.5 font-medium">Time</th>
-              <th className="text-left px-4 py-2.5 font-medium">Actions</th>
             </tr></thead>
             <tbody>
               {paginated.map((ex) => (
@@ -126,12 +125,6 @@ export default function HistoryPage() {
                   <td className="px-4 py-2.5 text-gray-400">{ex.current_step_index}/{ex.total_steps}</td>
                   <td className="px-4 py-2.5 text-accent font-mono">{ex.completed_at ? formatDuration(ex.started_at, ex.completed_at) : '—'}</td>
                   <td className="px-4 py-2.5 text-gray-500">{formatRelativeTime(ex.started_at)}</td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button className="p-1 rounded hover:bg-surface-2 cursor-pointer" title="View"><Eye size={12} className="text-gray-400" /></button>
-                      <button className="p-1 rounded hover:bg-surface-2 cursor-pointer" title="Replay"><RotateCcw size={12} className="text-gray-400" /></button>
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>

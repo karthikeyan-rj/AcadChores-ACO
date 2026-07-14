@@ -71,7 +71,7 @@ export function WorkflowGraph({ steps, activeStepIndex, onStepClick, selectedSte
                 <div className={cn(
                   'relative z-10 w-[38px] h-[38px] rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-300',
                   status === 'completed' && 'bg-accent/10 border-accent/50',
-                  status === 'running' && 'bg-primary/10 border-primary glow-primary animate-pulse',
+                  status === 'running' && 'bg-primary/10 border-primary animate-pulse',
                   status === 'failed' && 'bg-danger/10 border-danger/50',
                   status === 'pending' && 'bg-surface border-border',
                   isSelected && 'ring-2 ring-primary/30 ring-offset-2 ring-offset-background'

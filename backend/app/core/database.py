@@ -6,7 +6,7 @@ from redis.asyncio import Redis, from_url
 from app.core.config import settings
 from app.infrastructure.db.models import (
     User, Workflow, WorkflowExecution, TaskLog, PermissionPolicy, FileIndex, MemoryStore,
-    IndexConfig, IndexJob
+    IndexConfig, IndexJob, UserApiKey, FallbackUsage, UserSettings
 )
 
 logger = logging.getLogger(__name__)
@@ -28,29 +28,33 @@ class DatabaseManager:
             try:
                 self.db = self.mongo_client.get_default_database()
             except Exception:
-                self.db = self.mongo_client["aco"]
+                self.db = self.mongo_client[settings.MONGODB_DATABASE]
             await asyncio.wait_for(
                 init_beanie(
                     database=self.db,
-                    document_models=[User, Workflow, WorkflowExecution, TaskLog, PermissionPolicy, FileIndex, MemoryStore, IndexConfig, IndexJob]
+                    document_models=[User, Workflow, WorkflowExecution, TaskLog, PermissionPolicy, FileIndex, MemoryStore, IndexConfig, IndexJob, UserApiKey, FallbackUsage, UserSettings]
                 ),
                 timeout=10.0
             )
             await asyncio.wait_for(self.db.command("ping"), timeout=5.0)
             self.use_memory = False
-            logger.info("Successfully connected to MongoDB Atlas — using real database.")
+            logger.info("Successfully connected to MongoDB — using real database.")
         except Exception as e:
             self.use_memory = True
             logger.warning(f"MongoDB offline: {e}. Using In-Memory storage.")
 
         # 2. Connect to Redis (for event bus / task queue)
-        try:
-            self.redis_client = from_url(settings.REDIS_URL, decode_responses=True)
-            await asyncio.wait_for(self.redis_client.ping(), timeout=3.0)
-            logger.info("Successfully connected to Redis.")
-        except Exception as e:
+        if not settings.REDIS_ENABLED:
             self.redis_client = None
-            logger.warning(f"Redis offline: {e}. Using In-Memory event bus and task queue.")
+            logger.info("Redis disabled by configuration (REDIS_ENABLED=false). Using in-memory event bus and task queue.")
+        else:
+            try:
+                self.redis_client = from_url(settings.REDIS_URL, decode_responses=True)
+                await asyncio.wait_for(self.redis_client.ping(), timeout=3.0)
+                logger.info("Successfully connected to Redis.")
+            except Exception as e:
+                self.redis_client = None
+                logger.warning(f"Redis offline: {e}. Using in-memory event bus and task queue.")
 
     async def close(self):
         if self.mongo_client:

@@ -37,9 +37,17 @@ RECOVERY_PIPELINE = [
 class RecoveryEngine:
     def __init__(self):
         self._attempts: Dict[str, int] = {}
+        self._max_tracked_steps = 200
 
     def get_attempts(self, step_id: str) -> int:
         return self._attempts.get(step_id, 0)
+
+    def _cleanup_old_attempts(self):
+        """Evict oldest entries if dict grows too large."""
+        if len(self._attempts) > self._max_tracked_steps:
+            keys = list(self._attempts.keys())
+            for k in keys[: len(keys) // 2]:
+                self._attempts.pop(k, None)
 
     async def recover(
         self,
@@ -50,6 +58,7 @@ class RecoveryEngine:
     ) -> RecoveryAction:
         attempt = self._attempts.get(step_id, 0) + 1
         self._attempts[step_id] = attempt
+        self._cleanup_old_attempts()
 
         agent_type = step.get("agent_type", "")
         action = step.get("action", "")

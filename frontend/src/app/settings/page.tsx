@@ -1,54 +1,201 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Settings, User, Palette, Cpu, Globe, Shield, Code, Info,
-  Save, RotateCcw, Bell, Puzzle, Key, Database, Terminal,
-  Check, Moon, Sun, Monitor, Eye, EyeOff
-} from 'lucide-react';
+import { Settings, Cpu, Info, Save, Check, Loader2, Eye, EyeOff, Trash2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 
-type SettingsTab = 'general' | 'appearance' | 'ai' | 'browser' | 'permissions' | 'notifications' | 'plugins' | 'developer' | 'about';
+type SettingsTab = 'ai' | 'about';
 
 const tabs: { id: SettingsTab; label: string; icon: any }[] = [
-  { id: 'general', label: 'General', icon: User },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'ai', label: 'AI Model', icon: Cpu },
-  { id: 'browser', label: 'Browser', icon: Globe },
-  { id: 'permissions', label: 'Permissions', icon: Shield },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'plugins', label: 'Plugins', icon: Puzzle },
-  { id: 'developer', label: 'Developer', icon: Code },
   { id: 'about', label: 'About', icon: Info },
 ];
 
-export default function SettingsPage() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState<SettingsTab>('general');
-  const [saved, setSaved] = useState(false);
+interface UserSettings {
+  cloud_fallback_enabled: boolean;
+  cloud_provider: string;
+  cloud_model: string;
+  api_key_configured: boolean;
+  api_key_hint: string | null;
+  workflow_quality_threshold: number;
+  local_planner_retry_count: number;
+}
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+const DEFAULT_SETTINGS: UserSettings = {
+  cloud_fallback_enabled: false,
+  cloud_provider: 'openai',
+  cloud_model: 'gpt-4o-mini',
+  api_key_configured: false,
+  api_key_hint: null,
+  workflow_quality_threshold: 70,
+  local_planner_retry_count: 1,
+};
+
+const PROVIDERS = [
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'gemini', label: 'Google Gemini' },
+];
+
+const MODELS: Record<string, { value: string; label: string }[]> = {
+  openai: [
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'gpt-4o', label: 'GPT-4o' },
+  ],
+  anthropic: [
+    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+    { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
+  ],
+  gemini: [
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+  ],
+};
+
+export default function SettingsPage() {
+  const { token } = useAuth();
+  const [tab, setTab] = useState<SettingsTab>('ai');
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
+  const [deletingKey, setDeletingKey] = useState(false);
+  const [keySaveSuccess, setKeySaveSuccess] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
+
+  const loadSettings = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getSettings(token);
+      setSettings({
+        cloud_fallback_enabled: data.cloud_fallback_enabled,
+        cloud_provider: data.cloud_provider,
+        cloud_model: data.cloud_model,
+        api_key_configured: data.api_key_configured,
+        api_key_hint: data.api_key_hint,
+        workflow_quality_threshold: data.workflow_quality_threshold,
+        local_planner_retry_count: data.local_planner_retry_count,
+      });
+      setDirty(false);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { loadSettings(); }, [loadSettings]);
+
+  const handleSave = async () => {
+    if (!token || !dirty) return;
+    setSaving(true);
+    setSaveSuccess(false);
+    setError(null);
+    try {
+      const payload: Record<string, any> = {
+        cloud_fallback_enabled: settings.cloud_fallback_enabled,
+        cloud_provider: settings.cloud_provider,
+        cloud_model: settings.cloud_model,
+        workflow_quality_threshold: settings.workflow_quality_threshold,
+        local_planner_retry_count: settings.local_planner_retry_count,
+      };
+      const data = await api.updateSettings(payload, token);
+      setSettings(prev => ({
+        ...prev,
+        api_key_configured: data.api_key_configured,
+        api_key_hint: data.api_key_hint,
+      }));
+      setDirty(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (e: any) {
+      setError(e.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!token || !apiKeyInput.trim()) return;
+    setSavingKey(true);
+    setKeyError(null);
+    setKeySaveSuccess(false);
+    try {
+      await api.saveSettingsApiKey(settings.cloud_provider, apiKeyInput.trim(), token);
+      setApiKeyInput('');
+      setKeySaveSuccess(true);
+      setTimeout(() => setKeySaveSuccess(false), 2000);
+      await loadSettings();
+    } catch (e: any) {
+      setKeyError(e.message || 'Failed to save API key');
+    } finally {
+      setSavingKey(false);
+    }
+  };
+
+  const handleDeleteApiKey = async () => {
+    if (!token) return;
+    setDeletingKey(true);
+    setKeyError(null);
+    try {
+      await api.deleteSettingsApiKey(settings.cloud_provider, token);
+      setKeySaveSuccess(false);
+      await loadSettings();
+    } catch (e: any) {
+      setKeyError(e.message || 'Failed to delete API key');
+    } finally {
+      setDeletingKey(false);
+    }
+  };
+
+  const updateField = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    setDirty(true);
   };
 
   return (
     <div className="p-6 max-w-[1000px] mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold">Settings</h1>
+          <h1 className="text-xl font-bold text-foreground">Settings</h1>
           <p className="text-xs text-gray-500 mt-0.5">Configure your ACO environment</p>
         </div>
-        <button onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-xl shadow-lg shadow-primary/20 transition cursor-pointer">
-          {saved ? <><Check size={14} />Saved!</> : <><Save size={14} />Save Changes</>}
-        </button>
+        {tab === 'ai' && (
+          <button
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition cursor-pointer',
+              dirty && !saving
+                ? 'bg-primary text-white hover:bg-primary-hover'
+                : 'bg-surface-2 text-gray-500 cursor-not-allowed'
+            )}
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : saveSuccess ? <Check size={14} /> : <Save size={14} />}
+            {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Changes'}
+          </button>
+        )}
       </div>
 
+      {error && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
+          <AlertCircle size={14} />
+          {error}
+        </div>
+      )}
+
       <div className="flex gap-5">
-        {/* Tab sidebar */}
         <div className="w-[180px] shrink-0 space-y-0.5">
           {tabs.map(t => {
             const Icon = t.icon;
@@ -64,255 +211,122 @@ export default function SettingsPage() {
           })}
         </div>
 
-        {/* Tab content */}
-        <div className="flex-1 rounded-xl border border-border bg-card/80 p-6 min-w-0">
+        <div className="flex-1 rounded-xl border border-border bg-card p-6 min-w-0">
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.15 }}>
 
-              {tab === 'general' && (
-                <div className="space-y-5">
-                  <Section title="Profile">
-                    <Field label="Display Name">
-                      <input type="text" defaultValue={user?.name || ''} className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                    </Field>
-                    <Field label="Email">
-                      <input type="email" defaultValue={user?.email || ''} className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                    </Field>
-                  </Section>
-                  <Section title="Language & Region">
-                    <Field label="Language">
-                      <select className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition">
-                        <option>English</option><option>Hindi</option><option>Spanish</option>
-                      </select>
-                    </Field>
-                    <Field label="Timezone">
-                      <select className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition">
-                        <option>Asia/Kolkata (IST)</option><option>UTC</option><option>US/Pacific (PST)</option>
-                      </select>
-                    </Field>
-                  </Section>
-                  <Section title="Data & Privacy">
-                    <Toggle label="Allow anonymous usage analytics" />
-                    <Toggle label="Store conversation history" defaultOn />
-                    <Toggle label="Auto-save workflow drafts" defaultOn />
-                  </Section>
-                </div>
-              )}
-
-              {tab === 'appearance' && (
-                <div className="space-y-5">
-                  <Section title="Theme">
-                    <div className="grid grid-cols-3 gap-3">
-                      {['Dark', 'Midnight', 'OLED'].map(theme => (
-                        <div key={theme} className={cn(
-                          'p-3 rounded-lg border cursor-pointer text-center transition',
-                          theme === 'Dark' ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-border-light'
-                        )}>
-                          <div className="w-full h-16 rounded bg-background border border-border mb-2 flex items-center justify-center">
-                            {theme === 'OLED' && <div className="w-6 h-6 rounded-full bg-black border border-gray-800" />}
-                            {theme === 'Midnight' && <div className="w-6 h-6 rounded-full bg-blue-950 border border-blue-800" />}
-                            {theme === 'Dark' && <div className="w-6 h-6 rounded-full bg-gray-900 border border-gray-700" />}
-                          </div>
-                          <span className="text-[11px] font-medium">{theme}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
-                  <Section title="Accent Color">
-                    <div className="flex gap-2">
-                      {['#7c5bf5', '#3b82f6', '#34d399', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#ec4899'].map(color => (
-                        <button key={color} className="w-7 h-7 rounded-full border-2 border-transparent hover:border-white/20 transition cursor-pointer"
-                          style={{ background: color }} title={color} />
-                      ))}
-                    </div>
-                  </Section>
-                  <Section title="Layout">
-                    <Toggle label="Compact mode" />
-                    <Toggle label="Show status bar" defaultOn />
-                    <Toggle label="Animate page transitions" defaultOn />
-                    <Toggle label="Show sidebar tooltips" defaultOn />
-                    <Toggle label="Reduce motion" />
-                  </Section>
-                </div>
-              )}
-
               {tab === 'ai' && (
-                <div className="space-y-5">
-                  <Section title="Model Configuration">
-                    <Field label="LLM Provider">
-                      <select className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition">
-                        <option>Ollama (Local)</option><option>OpenAI</option><option>Anthropic</option><option>Custom Endpoint</option>
-                      </select>
-                    </Field>
-                    <Field label="Model">
-                      <select className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition">
-                        <option>llama3.1</option><option>mistral</option><option>codellama</option><option>gpt-4o</option>
-                      </select>
-                    </Field>
-                    <Field label="Temperature">
-                      <div className="flex items-center gap-3">
-                        <input type="range" min="0" max="100" defaultValue="30" className="flex-1 accent-primary" />
-                        <span className="text-xs text-gray-400 w-8 text-right">0.3</span>
-                      </div>
-                    </Field>
-                    <Field label="Max Tokens">
-                      <input type="number" defaultValue={4096} className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                    </Field>
-                    <Field label="Top P">
-                      <div className="flex items-center gap-3">
-                        <input type="range" min="0" max="100" defaultValue="90" className="flex-1 accent-primary" />
-                        <span className="text-xs text-gray-400 w-8 text-right">0.9</span>
-                      </div>
-                    </Field>
-                  </Section>
-                  <Section title="Planning">
-                    <Toggle label="Auto-generate workflow plans" defaultOn />
-                    <Toggle label="Require confirmation before execution" defaultOn />
-                    <Toggle label="Email draft confirmation" defaultOn />
-                    <Toggle label="Use vision model for screenshots" />
-                    <Toggle label="Enable step recovery on failure" defaultOn />
-                  </Section>
-                </div>
-              )}
-
-              {tab === 'browser' && (
-                <div className="space-y-5">
-                  <Section title="Browser Settings">
-                    <Field label="Browser Engine">
-                      <select className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition">
-                        <option>Chromium (Playwright)</option><option>Firefox</option><option>WebKit</option>
-                      </select>
-                    </Field>
-                    <Toggle label="Run browser in headless mode" defaultOn />
-                    <Field label="Default Timeout (ms)">
-                      <input type="number" defaultValue={30000} className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                    </Field>
-                    <Field label="Viewport Size">
-                      <select className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition">
-                        <option>1280 x 720</option><option>1920 x 1080</option><option>1440 x 900</option><option>Custom</option>
-                      </select>
-                    </Field>
-                  </Section>
-                  <Section title="Screenshot & Recording">
-                    <Toggle label="Auto-capture screenshots on steps" defaultOn />
-                    <Toggle label="Record browser sessions" />
-                    <Field label="Screenshot Quality">
-                      <select className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition">
-                        <option>High (PNG)</option><option>Medium (JPEG 80%)</option><option>Low (JPEG 50%)</option>
-                      </select>
-                    </Field>
-                  </Section>
-                  <Section title="User Agent">
-                    <Field label="Custom User Agent">
-                      <input type="text" placeholder="Leave empty for default" className="w-full px-3 py-2 text-xs font-mono bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                    </Field>
-                  </Section>
-                </div>
-              )}
-
-              {tab === 'permissions' && (
-                <div className="space-y-5">
-                  <Section title="Auto-Approval">
-                    <Toggle label="Auto-approve file operations" />
-                    <Toggle label="Auto-approve web navigation" defaultOn />
-                    <Toggle label="Auto-approve terminal commands" />
-                    <Toggle label="Auto-approve email sending" />
-                    <Toggle label="Auto-approve browser clicks" />
-                  </Section>
-                  <Section title="Safety">
-                    <Toggle label="Block destructive commands" defaultOn />
-                    <Toggle label="Sandbox file operations" defaultOn />
-                    <Toggle label="Log all actions" defaultOn />
-                    <Toggle label="Require confirmation for external URLs" defaultOn />
-                    <Toggle label="Block file deletion without confirmation" defaultOn />
-                  </Section>
-                  <Section title="API Keys">
-                    <Field label="Gmail OAuth Token">
-                      <div className="flex gap-2">
-                        <input type="password" placeholder="••••••••" className="flex-1 px-3 py-2 text-xs bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                        <button className="px-3 py-2 text-xs text-gray-400 hover:text-foreground bg-surface border border-border rounded-lg transition cursor-pointer"><Eye size={13} /></button>
-                      </div>
-                    </Field>
-                  </Section>
-                </div>
-              )}
-
-              {tab === 'notifications' && (
-                <div className="space-y-5">
-                  <Section title="Notification Types">
-                    <Toggle label="Workflow completed" defaultOn />
-                    <Toggle label="Workflow failed" defaultOn />
-                    <Toggle label="Permission required" defaultOn />
-                    <Toggle label="Recovery started" defaultOn />
-                    <Toggle label="Recovery completed" defaultOn />
-                    <Toggle label="Browser opened/closed" />
-                    <Toggle label="Plugin installed" defaultOn />
-                    <Toggle label="System updates" defaultOn />
-                  </Section>
-                  <Section title="Delivery">
-                    <Toggle label="Desktop notifications" defaultOn />
-                    <Toggle label="Sound alerts" />
-                    <Toggle label="Email notifications" />
-                    <Toggle label="In-app only" defaultOn />
-                  </Section>
-                </div>
-              )}
-
-              {tab === 'plugins' && (
-                <div className="space-y-5">
-                  <Section title="Installed Plugins">
-                    <div className="space-y-2">
-                      {['Gmail Enhanced', 'YouTube Scraper', 'Shell Commander', 'MongoDB Connector', 'Workflow Templates'].map(p => (
-                        <div key={p} className="flex items-center justify-between p-3 rounded-lg bg-surface border border-border">
-                          <span className="text-xs font-medium">{p}</span>
-                          <div className="flex items-center gap-2">
-                            <Toggle label="" defaultOn />
+                <div className="space-y-6">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 size={24} className="animate-spin text-gray-500" />
+                    </div>
+                  ) : (
+                    <>
+                      <Section title="Cloud Fallback">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs text-gray-400">Enable cloud fallback when local planner quality is low</span>
+                            <p className="text-[10px] text-gray-500 mt-0.5">Falls back to cloud API if Ollama output quality is below threshold</p>
                           </div>
+                          <button onClick={() => updateField('cloud_fallback_enabled', !settings.cloud_fallback_enabled)}
+                            className={cn('w-9 h-5 rounded-full transition-colors cursor-pointer relative',
+                              settings.cloud_fallback_enabled ? 'bg-primary' : 'bg-surface-3')}>
+                            <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
+                              settings.cloud_fallback_enabled ? 'left-[18px]' : 'left-0.5')} />
+                          </button>
                         </div>
-                      ))}
-                    </div>
-                  </Section>
-                  <Section title="Plugin Settings">
-                    <Toggle label="Auto-update plugins" defaultOn />
-                    <Toggle label="Allow community plugins" defaultOn />
-                    <Toggle label="Sandbox plugin execution" defaultOn />
-                  </Section>
-                </div>
-              )}
+                      </Section>
 
-              {tab === 'developer' && (
-                <div className="space-y-5">
-                  <Section title="API Configuration">
-                    <Field label="Backend URL">
-                      <input type="text" defaultValue="http://localhost:8001" className="w-full px-3 py-2 text-xs font-mono bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                    </Field>
-                    <Field label="WebSocket URL">
-                      <input type="text" defaultValue="ws://localhost:8001/ws" className="w-full px-3 py-2 text-xs font-mono bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                    </Field>
-                    <Field label="API Key">
-                      <div className="flex gap-2">
-                        <input type="password" placeholder="Optional API key" className="flex-1 px-3 py-2 text-xs font-mono bg-surface border border-border rounded-lg outline-none focus:border-primary transition" />
-                        <button className="px-3 py-2 text-xs text-gray-400 hover:text-foreground bg-surface border border-border rounded-lg transition cursor-pointer"><Eye size={13} /></button>
-                      </div>
-                    </Field>
-                  </Section>
-                  <Section title="Debug">
-                    <Toggle label="Enable debug logging" />
-                    <Toggle label="Show WebSocket events" />
-                    <Toggle label="Verbose API responses" />
-                    <Toggle label="Log LLM prompts" />
-                    <Toggle label="Show performance metrics" />
-                  </Section>
-                  <Section title="Data Management">
-                    <div className="flex gap-2">
-                      <button className="flex items-center gap-2 px-3 py-2 text-xs text-warning hover:bg-warning/5 rounded-lg transition cursor-pointer border border-warning/20">
-                        <RotateCcw size={13} />Reset Settings
-                      </button>
-                      <button className="flex items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-danger/5 rounded-lg transition cursor-pointer border border-danger/20">
-                        <RotateCcw size={13} />Clear All Data
-                      </button>
-                    </div>
-                  </Section>
+                      <Section title="Cloud Provider">
+                        <Field label="Provider">
+                          <select value={settings.cloud_provider}
+                            onChange={(e) => {
+                              updateField('cloud_provider', e.target.value);
+                              const models = MODELS[e.target.value];
+                              if (models && models.length > 0) {
+                                updateField('cloud_model', models[0].value);
+                              }
+                            }}
+                            className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg outline-none focus:border-primary transition">
+                            {PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="Model">
+                          <select value={settings.cloud_model}
+                            onChange={(e) => updateField('cloud_model', e.target.value)}
+                            className="w-full px-3 py-2 text-xs bg-surface-2 border border-border rounded-lg outline-none focus:border-primary transition">
+                            {(MODELS[settings.cloud_provider] || MODELS.openai).map(m =>
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            )}
+                          </select>
+                        </Field>
+                      </Section>
+
+                      <Section title="API Key">
+                        <p className="text-[10px] text-gray-500 mb-3">
+                          {settings.api_key_configured
+                            ? `Configured for ${settings.cloud_provider} — ${settings.api_key_hint || '••••••••'}`
+                            : `No API key configured for ${settings.cloud_provider}`
+                          }
+                        </p>
+                        <div className="flex gap-2">
+                          <div className="flex-1 relative">
+                            <input
+                              type={showApiKey ? 'text' : 'password'}
+                              value={apiKeyInput}
+                              onChange={(e) => setApiKeyInput(e.target.value)}
+                              placeholder={settings.api_key_configured ? 'Enter new key to replace' : 'Enter API key'}
+                              className="w-full px-3 py-2 pr-10 text-xs font-mono bg-surface-2 border border-border rounded-lg outline-none focus:border-primary transition"
+                            />
+                            <button onClick={() => setShowApiKey(p => !p)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-foreground transition cursor-pointer">
+                              {showApiKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </button>
+                          </div>
+                          <button onClick={handleSaveApiKey}
+                            disabled={!apiKeyInput.trim() || savingKey}
+                            className={cn(
+                              'px-3 py-2 text-xs font-medium rounded-lg transition cursor-pointer',
+                              apiKeyInput.trim() && !savingKey
+                                ? 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20'
+                                : 'bg-surface-2 text-gray-500 border border-border cursor-not-allowed'
+                            )}>
+                            {savingKey ? <Loader2 size={13} className="animate-spin" /> : keySaveSuccess ? <Check size={13} /> : 'Save Key'}
+                          </button>
+                          {settings.api_key_configured && (
+                            <button onClick={handleDeleteApiKey}
+                              disabled={deletingKey}
+                              className="px-3 py-2 text-xs font-medium text-danger hover:bg-danger/10 rounded-lg transition cursor-pointer border border-danger/20">
+                              {deletingKey ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                            </button>
+                          )}
+                        </div>
+                        {keyError && <p className="text-[10px] text-danger mt-2">{keyError}</p>}
+                      </Section>
+
+                      <Section title="Planning">
+                        <Field label={`Quality Threshold (${settings.workflow_quality_threshold})`}>
+                          <div className="flex items-center gap-3">
+                            <input type="range" min={50} max={100} value={settings.workflow_quality_threshold}
+                              onChange={(e) => updateField('workflow_quality_threshold', parseInt(e.target.value))}
+                              className="flex-1 accent-primary" />
+                            <span className="text-xs text-gray-400 w-8 text-right">{settings.workflow_quality_threshold}</span>
+                          </div>
+                          <p className="text-[10px] text-gray-500 mt-1">Minimum quality score (50–100) for local planner output before cloud fallback triggers</p>
+                        </Field>
+                        <Field label={`Local Retry Count (${settings.local_planner_retry_count})`}>
+                          <div className="flex items-center gap-3">
+                            <input type="range" min={0} max={3} value={settings.local_planner_retry_count}
+                              onChange={(e) => updateField('local_planner_retry_count', parseInt(e.target.value))}
+                              className="flex-1 accent-primary" />
+                            <span className="text-xs text-gray-400 w-8 text-right">{settings.local_planner_retry_count}</span>
+                          </div>
+                          <p className="text-[10px] text-gray-500 mt-1">Number of times to retry local Ollama planner before considering fallback (0–3)</p>
+                        </Field>
+                      </Section>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -332,7 +346,6 @@ export default function SettingsPage() {
                       <InfoRow label="Backend" value="FastAPI + Playwright + LangGraph" />
                       <InfoRow label="AI Provider" value="Ollama (Local LLM)" />
                       <InfoRow label="Database" value="MongoDB" />
-                      <InfoRow label="Cache" value="Redis" />
                       <InfoRow label="Animations" value="Framer Motion" />
                     </div>
                   </Section>
@@ -365,7 +378,7 @@ export default function SettingsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">{title}</h3>
+      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-3">{title}</h3>
       <div className="space-y-3">{children}</div>
     </div>
   );
@@ -376,19 +389,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="text-[10px] text-gray-500 mb-1 block">{label}</label>
       {children}
-    </div>
-  );
-}
-
-function Toggle({ label, defaultOn = false }: { label: string; defaultOn?: boolean }) {
-  const [on, setOn] = useState(defaultOn);
-  return (
-    <div className="flex items-center justify-between">
-      {label && <span className="text-xs text-gray-300">{label}</span>}
-      <button onClick={() => setOn(p => !p)}
-        className={cn('w-9 h-5 rounded-full transition-colors cursor-pointer relative', on ? 'bg-primary' : 'bg-surface-3')}>
-        <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform', on ? 'left-[18px]' : 'left-0.5')} />
-      </button>
     </div>
   );
 }

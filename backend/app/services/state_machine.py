@@ -16,6 +16,19 @@ logger = logging.getLogger(__name__)
 _in_memory_states: Dict[str, str] = {}
 _in_memory_state_details: Dict[str, str] = {}
 
+# Maximum entries before cleanup (1000)
+_MAX_IN_MEMORY_ENTRIES = 1000
+
+
+def _cleanup_in_memory_states():
+    """Evict oldest entries if the in-memory cache grows too large."""
+    if len(_in_memory_states) > _MAX_IN_MEMORY_ENTRIES:
+        # Remove the oldest half of entries (by insertion order in dict)
+        keys = list(_in_memory_states.keys())
+        for k in keys[: len(keys) // 2]:
+            _in_memory_states.pop(k, None)
+            _in_memory_state_details.pop(k, None)
+
 class WorkflowState(str, Enum):
     IDLE = "Idle"
     PLANNING = "Planning"
@@ -103,6 +116,7 @@ class WorkflowStateMachine:
         else:
             _in_memory_states[execution_id] = new_state.value
             _in_memory_state_details[execution_id] = json.dumps(state_data)
+            _cleanup_in_memory_states()
 
         # 2. Update MongoDB or In-Memory
         if db_manager.use_memory:

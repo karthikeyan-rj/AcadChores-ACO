@@ -1,15 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import List, Dict, Any, Optional
 from bson import ObjectId
 from pydantic import BaseModel
 from beanie import PydanticObjectId
 
 from app.core.database import db_manager
+from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.infrastructure.db.models import Workflow, Step, User
 from app.infrastructure.memory_db import memory_db
 from app.services.planner import planner_service
 from app.services.workflow_engine import workflow_engine
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_user_id
 
 router = APIRouter()
 
@@ -27,12 +29,13 @@ class ChatRequest(BaseModel):
 class PlanGenerationResponse(BaseModel):
     success: bool
     steps: List[Dict[str, Any]]
+    planner_metadata: Optional[Dict[str, Any]] = None
 
 @router.get("")
 async def list_workflows(user: User = Depends(get_current_user)):
     if db_manager.use_memory:
-        docs = await memory_db.find_sorted("workflows", "created_at", limit=50)
-        return docs
+        all_docs = await memory_db.find_sorted("workflows", "created_at", limit=200)
+        return [d for d in all_docs if d.get("owner_id") == get_user_id(user)]
     workflows = await Workflow.find(Workflow.owner_id == user.id).to_list()
     return workflows
 
@@ -59,15 +62,17 @@ async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_c
     return {"_id": str(workflow.id), "title": workflow.title, "steps": [s.model_dump() for s in workflow.steps]}
 
 @router.post("/generate-plan")
-async def generate_plan(req: PlanGenerationRequest):
+@limiter.limit(settings.RATE_LIMIT_AI)
+async def generate_plan(request: Request, req: PlanGenerationRequest, user: User = Depends(get_current_user)):
     try:
-        result = await planner_service.generate_workflow_steps(req.prompt)
+        result = await planner_service.generate_workflow_steps(req.prompt, user_id=str(user.id))
         return {"success": True, **result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat")
-async def chat(req: ChatRequest):
+@limiter.limit(settings.RATE_LIMIT_AI)
+async def chat(request: Request, req: ChatRequest, user: User = Depends(get_current_user)):
     from app.ai import llm_service
     import asyncio
     try:

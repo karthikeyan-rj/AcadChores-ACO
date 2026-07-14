@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { api, setAuthFailureHandler } from '@/lib/api';
 
 interface User {
   id: string;
@@ -30,15 +31,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const wsCloseRefs = useRef<Set<() => void>>(new Set());
+
+  const logout = useCallback(() => {
+    wsCloseRefs.current.forEach((close) => {
+      try { close(); } catch {}
+    });
+    wsCloseRefs.current.clear();
+    localStorage.removeItem('aco_token');
+    localStorage.removeItem('aco_user');
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  useEffect(() => {
+    setAuthFailureHandler(() => {
+      localStorage.removeItem('aco_token');
+      localStorage.removeItem('aco_user');
+      setToken(null);
+      setUser(null);
+    });
+    return () => setAuthFailureHandler(null);
+  }, []);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('aco_token');
     const storedUser = localStorage.getItem('aco_user');
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+
+    if (!storedToken || !storedUser) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    let parsedUser: User;
+    try {
+      parsedUser = JSON.parse(storedUser);
+    } catch {
+      localStorage.removeItem('aco_token');
+      localStorage.removeItem('aco_user');
+      setLoading(false);
+      return;
+    }
+
+    setToken(storedToken);
+    setUser(parsedUser);
+
+    api.me(storedToken)
+      .then((data: any) => {
+        const freshUser: User = {
+          id: data.id || data._id,
+          email: data.email,
+          name: data.name,
+          avatar_url: data.avatar_url,
+          role: data.role,
+        };
+        setUser(freshUser);
+        localStorage.setItem('aco_user', JSON.stringify(freshUser));
+      })
+      .catch(() => {
+        localStorage.removeItem('aco_token');
+        localStorage.removeItem('aco_user');
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const saveAuth = (accessToken: string, userData: User) => {
@@ -88,13 +144,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const data = await res.json();
     saveAuth(data.access_token, data.user);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('aco_token');
-    localStorage.removeItem('aco_user');
-    setToken(null);
-    setUser(null);
   };
 
   return (

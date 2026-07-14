@@ -149,3 +149,50 @@ class MemoryStore(Document):
     class Settings:
         name = "memory_store"
         indexes = ["user_id", "type", "key"]
+
+
+class UserApiKey(Document):
+    user_id: PydanticObjectId
+    provider: str  # openai, anthropic, gemini
+    encrypted_key: str
+    key_hint: str = ""  # masked display like "••••••••abcd"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "user_api_keys"
+        indexes = ["user_id", ("user_id", "provider")]
+
+
+class FallbackUsage(Document):
+    user_id: PydanticObjectId
+    provider: str
+    model: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    fallback_reason: str
+    planner_source: str  # rule_based, ollama, ollama_repair, cloud_fallback
+    local_attempts: int = 0
+    quality_score: float = 0.0
+    success: bool = True
+    tokens_input: int = 0
+    tokens_output: int = 0
+    latency_ms: float = 0.0
+
+    class Settings:
+        name = "fallback_usage"
+        indexes = ["user_id", "timestamp", ("user_id", "timestamp")]
+
+
+class UserSettings(Document):
+    user_id: PydanticObjectId
+    cloud_fallback_enabled: bool = False
+    cloud_provider: str = "openai"
+    cloud_model: str = "gpt-4o-mini"
+    workflow_quality_threshold: int = 70
+    local_planner_retry_count: int = 1
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "user_settings"
+        indexes = ["user_id", ("user_id",)]

@@ -34,7 +34,7 @@ export function StepDetails({ step, index, status, onClose }: StepDetailsProps) 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 10 }}
-        className="rounded-xl border border-border bg-card/90 backdrop-blur-sm overflow-hidden"
+        className="rounded-xl border border-border bg-card overflow-hidden"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">

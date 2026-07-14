@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Cpu, Mail, Lock, User, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { getBackendUrl } from '@/lib/config';
 
 const GoogleSignIn = dynamic(() => import('./GoogleSignIn'), {
   ssr: false,
@@ -15,7 +14,7 @@ const GoogleSignIn = dynamic(() => import('./GoogleSignIn'), {
 });
 
 function LoginForm() {
-  const { user, login, register } = useAuth();
+  const { user, login, register, loginWithGoogle } = useAuth();
   const router = useRouter();
 
   const [isSignUp, setIsSignUp] = useState(false);
@@ -33,19 +32,8 @@ function LoginForm() {
     setError('');
     setSubmitting(true);
     try {
-      const res = await fetch(`${getBackendUrl()}/api/v1/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Google login failed');
-      }
-      const data = await res.json();
-      localStorage.setItem('aco_token', data.access_token);
-      localStorage.setItem('aco_user', JSON.stringify(data.user));
-      window.location.href = '/dashboard';
+      await loginWithGoogle(credential);
+      router.replace('/dashboard');
     } catch (e: any) {
       setError(e.message);
     } finally {

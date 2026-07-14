@@ -17,7 +17,7 @@ interface StatusBarProps {
 
 export function StatusBar({ backendConnected, wsConnected, stateMachineStatus, activeStepIndex, totalSteps }: StatusBarProps) {
   return (
-    <footer className="h-6 border-t border-border bg-card/30 backdrop-blur-xl flex items-center justify-between px-4 no-select text-[10px] text-gray-500 shrink-0">
+    <footer className="h-6 border-t border-border bg-card flex items-center justify-between px-4 no-select text-[10px] text-gray-500 shrink-0">
       <div className="flex items-center gap-3">
         <StatusPill icon={<Database size={10} />} label="Mongo" active={backendConnected} />
         <StatusPill icon={<Wifi size={10} />} label="Redis" active={backendConnected} />

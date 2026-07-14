@@ -34,7 +34,7 @@ export function PermissionModal({ permission, onDecision }: PermissionModalProps
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className="fixed top-4 right-4 z-[9999] w-[320px]"
       >
-        <div className="bg-card/95 backdrop-blur-xl border border-warning/30 rounded-xl shadow-2xl shadow-black/40 overflow-hidden">
+        <div className="bg-card border border-warning/30 rounded-xl shadow-2xl shadow-black/40 overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/50">
             <ShieldAlert size={14} className="text-warning shrink-0" />
             <span className="text-[11px] font-semibold text-foreground truncate">

@@ -1,13 +1,15 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 
+from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.core.security import (
-    verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token
+    verify_password, get_password_hash, create_access_token, create_refresh_token
 )
 from app.infrastructure.db.models import User
+from app.api.deps import get_current_user
 
 router = APIRouter()
 
@@ -49,7 +51,8 @@ def _token_response(user) -> dict:
     }
 
 @router.post("/register", response_model=TokenResponse)
-async def register(req: RegisterRequest):
+@limiter.limit(settings.RATE_LIMIT_REGISTER)
+async def register(request: Request, req: RegisterRequest):
     existing_user = await User.find_one(User.email == req.email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered.")
@@ -65,7 +68,8 @@ async def register(req: RegisterRequest):
     return _token_response(user)
 
 @router.post("/login", response_model=TokenResponse)
-async def login(req: LoginRequest):
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+async def login(request: Request, req: LoginRequest):
     user = await User.find_one(User.email == req.email)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -76,7 +80,8 @@ async def login(req: LoginRequest):
     return _token_response(user)
 
 @router.post("/login/form", response_model=TokenResponse)
-async def login_form(form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+async def login_form(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     user = await User.find_one(User.email == form_data.username)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -87,7 +92,8 @@ async def login_form(form_data: OAuth2PasswordRequestForm = Depends()):
     return _token_response(user)
 
 @router.post("/google", response_model=TokenResponse)
-async def google_auth(req: GoogleAuthRequest):
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+async def google_auth(request: Request, req: GoogleAuthRequest):
     """Authenticate via Google Identity Services ID token."""
     try:
         from google.oauth2 import id_token as google_id_token
@@ -129,12 +135,5 @@ async def google_auth(req: GoogleAuthRequest):
     return _token_response(user)
 
 @router.get("/me")
-async def get_me(token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login/form"))):
-    payload = decode_token(token)
-    email = payload.get("sub")
-    if not email:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    user = await User.find_one(User.email == email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+async def get_me(user: User = Depends(get_current_user)):
     return _user_dict(user)
