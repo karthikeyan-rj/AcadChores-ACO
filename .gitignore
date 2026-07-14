@@ -30,6 +30,11 @@ Thumbs.db
 *.log
 stderr.log
 server.log
+logs/
+
+# Runtime PID files
+.backend.pid
+.frontend.pid
 
 # Test caches
 .pytest_cache/
