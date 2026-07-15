@@ -17,7 +17,7 @@ function renderResult(text: string) {
   const flushList = () => {
     if (listItems.length > 0) {
       elements.push(
-        <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-1 my-2 text-gray-300">
+        <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-1 my-2 text-[#A1A1AA]">
           {listItems}
         </ul>
       );
@@ -35,11 +35,11 @@ function renderResult(text: string) {
         parts.push(t.slice(lastIndex, match.index));
       }
       if (match[2]) {
-        parts.push(<strong key={match.index} className="text-white font-semibold">{match[2]}</strong>);
+        parts.push(<strong key={match.index} className="text-[#F4F4F5] font-semibold">{match[2]}</strong>);
       } else {
         const url = match[0];
         parts.push(
-          <a key={match.index} href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 break-all">
+          <a key={match.index} href={url} target="_blank" rel="noopener noreferrer" className="text-[#7C3AED] underline hover:text-[#6D28D9] break-all">
             {url}
           </a>
         );
@@ -61,8 +61,8 @@ function renderResult(text: string) {
       flushList();
       elements.push(
         <div key={i} className="flex gap-3 my-1.5">
-          <span className="text-primary font-bold text-xs mt-0.5 shrink-0 w-5 text-right">{numMatch[1]}.</span>
-          <span className="text-gray-200 text-xs leading-relaxed">{renderInline(numMatch[2])}</span>
+          <span className="text-[#7C3AED] font-bold text-xs mt-0.5 shrink-0 w-5 text-right">{numMatch[1]}.</span>
+          <span className="text-[#A1A1AA] text-xs leading-relaxed">{renderInline(numMatch[2])}</span>
         </div>
       );
     } else if (bulletMatch) {
@@ -72,7 +72,7 @@ function renderResult(text: string) {
     } else {
       flushList();
       elements.push(
-        <p key={i} className="text-xs text-gray-200 leading-relaxed my-1">{renderInline(line)}</p>
+        <p key={i} className="text-xs text-[#A1A1AA] leading-relaxed my-1">{renderInline(line)}</p>
       );
     }
   }
@@ -87,11 +87,11 @@ export function ResultDisplay({ result }: ResultDisplayProps) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-accent/20 bg-accent/5 overflow-hidden"
+      className="rounded-[14px] border border-[#4ADE80]/20 bg-[#4ADE80]/5 overflow-hidden shadow-matte"
     >
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-accent/10">
-        <CheckCircle2 size={13} className="text-accent" />
-        <span className="text-[11px] font-semibold text-accent uppercase tracking-wider">Result</span>
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#4ADE80]/10">
+        <CheckCircle2 size={13} className="text-[#4ADE80]" />
+        <span className="text-[11px] font-semibold text-[#4ADE80] uppercase tracking-wider">Result</span>
       </div>
       <div className="p-4 pl-8 max-h-[400px] overflow-y-auto">
         {renderResult(result)}

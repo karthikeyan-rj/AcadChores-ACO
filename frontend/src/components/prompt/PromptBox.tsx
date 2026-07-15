@@ -34,12 +34,20 @@ export function PromptBox({ prompt, onPromptChange, onSubmit, loading, disabled 
   return (
     <div className="relative">
       <div className={cn(
-        'rounded-2xl border transition-all duration-200',
-        prompt ? 'border-primary/30' : 'border-border',
-        'bg-card'
+        'composer-focus rounded-[14px] border transition-all duration-200',
+        prompt ? 'border-[#7C3AED]/30' : 'border-white/[0.07]',
+        'bg-[#121419]'
       )}>
-        <div className="flex items-start gap-3 p-4">
-          <Sparkles size={18} className="text-primary mt-1 shrink-0" />
+        {/* Context label */}
+        <div className="flex items-center gap-2 px-4 pt-3 pb-0">
+          <Sparkles size={11} className="text-[#7C3AED]" />
+          <span className="text-[10px] text-[#71717A] font-medium uppercase tracking-wider">
+            Command Composer
+          </span>
+        </div>
+
+        {/* Textarea */}
+        <div className="px-4 py-3">
           <textarea
             ref={textareaRef}
             placeholder="Tell ACO what to do..."
@@ -49,50 +57,52 @@ export function PromptBox({ prompt, onPromptChange, onSubmit, loading, disabled 
             onFocus={() => !prompt && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             rows={2}
-            className="flex-1 bg-transparent outline-none resize-none text-sm placeholder-gray-500 text-foreground leading-relaxed"
+            aria-label="Task instruction"
+            className="w-full bg-transparent outline-none resize-none text-[13px] placeholder-[#71717A] text-[#F4F4F5] leading-relaxed min-h-[44px] max-h-[160px]"
           />
         </div>
+
+        {/* Footer bar */}
         <div className="flex items-center justify-between px-4 pb-3">
-          <div className="flex items-center gap-1">
-            <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer" title="Attach file">
-              <Paperclip size={14} />
+          <div className="flex items-center gap-0.5">
+            <button className="p-1.5 rounded-lg text-[#71717A] hover:text-[#A1A1AA] hover:bg-white/[0.05] transition cursor-pointer" title="Attach file" aria-label="Attach file">
+              <Paperclip size={15} />
             </button>
-            <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer" title="Voice input">
-              <Mic size={14} />
+            <button className="p-1.5 rounded-lg text-[#71717A] hover:text-[#A1A1AA] hover:bg-white/[0.05] transition cursor-pointer" title="Voice input" aria-label="Voice input">
+              <Mic size={15} />
             </button>
-            <button className="p-1.5 rounded-lg text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer" title="Screenshot">
-              <Camera size={14} />
+            <button className="p-1.5 rounded-lg text-[#71717A] hover:text-[#A1A1AA] hover:bg-white/[0.05] transition cursor-pointer" title="Screenshot" aria-label="Take screenshot">
+              <Camera size={15} />
             </button>
+            <span className="text-[10px] text-[#71717A]/50 ml-2 hidden sm:inline font-mono">Shift+Enter for newline</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-gray-600 hidden sm:inline">Model: Qwen (Ollama)</span>
-            <button
-              onClick={onSubmit}
-              disabled={disabled || loading || !prompt.trim()}
-              className={cn(
-                'flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200',
-                prompt.trim() && !loading
-                  ? 'bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/20 cursor-pointer'
-                  : 'bg-surface-2 text-gray-600 cursor-not-allowed'
-              )}
-            >
-              {loading ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <>
-                  <span>Execute</span>
-                  <Play size={12} className="fill-current" />
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={onSubmit}
+            disabled={disabled || loading || !prompt.trim()}
+            aria-label={loading ? 'Executing...' : 'Run command'}
+            className={cn(
+              'flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[11px] font-semibold transition-all duration-200',
+              prompt.trim() && !loading
+                ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white cursor-pointer'
+                : 'bg-white/[0.04] text-[#71717A] cursor-not-allowed'
+            )}
+          >
+            {loading ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <>
+                <span>Run</span>
+                <Play size={11} className="fill-current" />
+              </>
+            )}
+          </button>
         </div>
       </div>
 
       {/* Suggestions dropdown */}
       {showSuggestions && !prompt && (
-        <div className="absolute top-full left-0 right-0 mt-2 py-2 bg-card border border-border rounded-xl shadow-2xl z-50">
-          <p className="px-3 py-1.5 text-[10px] text-gray-500 uppercase font-semibold tracking-wider">Suggestions</p>
+        <div className="absolute top-full left-0 right-0 mt-2 py-2 bg-[#121419] border border-white/[0.07] rounded-[10px] shadow-2xl z-50">
+          <p className="px-3 py-1.5 text-[10px] text-[#71717A] uppercase font-semibold tracking-wider">Suggestions</p>
           {suggestions.map((s, i) => (
             <button
               key={i}
@@ -101,9 +111,9 @@ export function PromptBox({ prompt, onPromptChange, onSubmit, loading, disabled 
                 onPromptChange(s);
                 setShowSuggestions(false);
               }}
-              className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-surface-2 hover:text-foreground transition cursor-pointer flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-[12px] text-[#A1A1AA] hover:bg-white/[0.04] hover:text-[#F4F4F5] transition cursor-pointer flex items-center gap-2"
             >
-              <Sparkles size={10} className="text-primary shrink-0" />
+              <Sparkles size={10} className="text-[#7C3AED] shrink-0" />
               {s}
             </button>
           ))}

@@ -149,7 +149,8 @@ async def lifespan(app: FastAPI):
 
     # 2b. Subscribe event buffer for all execution-related topics + permission.request
     for topic in ["task.started", "task.progress", "task.completed", "task.failed",
-                   "verification.failed", "workflow.state_change", "permission.request"]:
+                   "verification.failed", "workflow.state_change", "permission.request",
+                   "workflow.cancelled"]:
         event_bus.subscribe(topic, _buffer_events)
 
     # 3. Start background Worker Pool (3 concurrency workers)
@@ -196,7 +197,14 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "project": settings.PROJECT_NAME}
+    db_health = db_manager.health_dict()
+    overall = "healthy" if db_manager.connected else "degraded"
+    return {
+        "status": overall,
+        "project": settings.PROJECT_NAME,
+        "database": db_health["mongodb"],
+        "redis": db_health["redis"],
+    }
 
 
 @app.websocket("/ws/executions/{execution_id}")
@@ -265,6 +273,7 @@ async def ws_execution_monitor(websocket: WebSocket, execution_id: str):
     forwarder_topics = [
         "workflow.state_change", "task.progress", "task.started",
         "task.completed", "task.failed", "permission.request", "verification.failed",
+        "workflow.cancelled",
     ]
     for topic in forwarder_topics:
         event_bus.subscribe(topic, event_forwarder)

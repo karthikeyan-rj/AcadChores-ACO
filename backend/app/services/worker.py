@@ -184,8 +184,15 @@ class WorkerPool:
 
             logger.info(f"Worker-{worker_id}: About to execute step {step_data}")
             try:
+                # Check if execution was cancelled before running
+                from app.services.state_machine import WorkflowStateMachine, WorkflowState
+                exec_status = await WorkflowStateMachine.get_status(execution_id)
+                if exec_status == WorkflowState.CANCELLED.value:
+                    logger.info(f"Worker-{worker_id}: execution {execution_id} is cancelled, skipping task {task_id}")
+                    return
+
                 result = await asyncio.wait_for(
-                    self.agent_manager.execute_step(step_data, progress_callback, user_id=step_data.get("user_id")),
+                    self.agent_manager.execute_step(step_data, progress_callback, user_id=step_data.get("user_id"), execution_id=execution_id),
                     timeout=TASK_EXECUTION_TIMEOUT,
                 )
             except asyncio.TimeoutError:

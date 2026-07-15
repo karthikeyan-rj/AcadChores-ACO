@@ -22,6 +22,8 @@ _in_memory_collections: Dict[str, Dict[str, Any]] = {
     "memory_store": {},
     "index_configs": {},
     "index_jobs": {},
+    "user_api_keys": {},
+    "user_settings": {},
 }
 
 def _load_from_disk():
@@ -157,6 +159,23 @@ class MemoryDB:
     @staticmethod
     async def count(collection: str) -> int:
         return len(_in_memory_collections[collection])
+
+    @staticmethod
+    async def delete(collection: str, filter_dict: dict) -> bool:
+        """Delete documents matching the filter. Returns True if any were deleted."""
+        to_delete = []
+        for doc_id, doc in _in_memory_collections[collection].items():
+            match = all(
+                doc.get(k) == v or str(doc.get(k, "")) == str(v)
+                for k, v in filter_dict.items()
+            )
+            if match:
+                to_delete.append(doc_id)
+        for doc_id in to_delete:
+            _in_memory_collections[collection].pop(doc_id, None)
+        if to_delete:
+            _save_to_disk()
+        return len(to_delete) > 0
 
     @staticmethod
     async def find_sorted(collection: str, sort_key: str, limit: int = 10, reverse: bool = True) -> List[dict]:

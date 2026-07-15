@@ -1,10 +1,11 @@
+import os
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 from bson import ObjectId
 
 from app.api.deps import get_current_user, get_user_id
 from app.core.database import db_manager
-from app.infrastructure.db.models import User, IndexConfig, IndexJob
+from app.infrastructure.db.models import User, IndexConfig, IndexJob, FileIndex
 from app.infrastructure.memory_db import memory_db
 from app.services.indexer import file_indexer
 from pydantic import BaseModel
@@ -19,6 +20,59 @@ class IndexConfigUpdate(BaseModel):
     max_file_size_mb: Optional[int] = None
     exclude_extensions: Optional[List[str]] = None
     exclude_dirs: Optional[List[str]] = None
+
+
+class FileDeleteRequest(BaseModel):
+    path: str
+
+
+def _get_user_roots(user_id_str: str, config_doc) -> List[str]:
+    """Extract allowed root paths from an index config."""
+    if config_doc is None:
+        return []
+    if isinstance(config_doc, dict):
+        return config_doc.get("roots", [])
+    return getattr(config_doc, "roots", []) or []
+
+
+async def _find_user_roots(user) -> List[str]:
+    """Get the user's configured index roots."""
+    user_id_str = str(user.id)
+    if db_manager.use_memory:
+        config = await memory_db.find_one("index_configs", {"user_id": user_id_str})
+        return _get_user_roots(user_id_str, config)
+    else:
+        try:
+            config = await IndexConfig.find_one(IndexConfig.user_id == user.id)
+        except Exception:
+            config = None
+        return _get_user_roots(user_id_str, config)
+
+
+def _normalize_and_validate_path(file_path: str, allowed_roots: List[str]) -> str:
+    """Normalize the path and ensure it falls within allowed workspace roots.
+
+    Returns the resolved absolute path if valid.
+    Raises HTTPException with a clear error if invalid.
+    """
+    expanded = os.path.expanduser(os.path.expandvars(file_path))
+    normalized = os.path.normpath(expanded)
+    resolved = os.path.abspath(normalized)
+
+    if not os.path.isabs(resolved):
+        raise HTTPException(status_code=400, detail="Path must be absolute.")
+
+    for root in allowed_roots:
+        root_expanded = os.path.expanduser(os.path.expandvars(root))
+        root_resolved = os.path.abspath(os.path.normpath(root_expanded))
+        if resolved == root_resolved or resolved.startswith(root_resolved + os.sep):
+            return resolved
+
+    raise HTTPException(
+        status_code=403,
+        detail="Path is outside your configured workspace roots. "
+               "Add this directory to your index roots first."
+    )
 
 
 @router.get("/files")
@@ -226,3 +280,72 @@ async def get_index_jobs(
 async def get_index_stats(user: User = Depends(get_current_user)):
     stats = await file_indexer.get_stats(user.id)
     return {"success": True, **stats}
+
+
+@router.post("/files/delete")
+async def delete_file(
+    req: FileDeleteRequest,
+    user: User = Depends(get_current_user)
+):
+    """Delete a single file within the user's configured workspace roots.
+
+    Path handling:
+    - Accepts a path in the request body (never in URL).
+    - Normalizes and resolves the path before validation.
+    - Validates against user's configured index roots.
+    - Rejects directories (use OS tools for directory removal).
+    - Returns clear errors for all failure modes.
+    """
+    file_path = req.path.strip()
+    if not file_path:
+        raise HTTPException(status_code=400, detail="File path is required.")
+
+    # Get user's allowed workspace roots
+    allowed_roots = await _find_user_roots(user)
+    if not allowed_roots:
+        raise HTTPException(
+            status_code=400,
+            detail="No index roots configured. Configure roots in Settings > Files first."
+        )
+
+    # Normalize and validate path stays within workspace
+    resolved_path = _normalize_and_validate_path(file_path, allowed_roots)
+
+    # Check existence
+    if not os.path.exists(resolved_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    # Reject directories
+    if os.path.isdir(resolved_path):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete directories through this endpoint. "
+                   "Use a terminal command to remove directories."
+        )
+
+    # Attempt deletion
+    try:
+        os.remove(resolved_path)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied. File may be read-only or in use.")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"File deletion failed: {e}")
+
+    # Remove stale metadata from the file index (best-effort)
+    try:
+        if db_manager.use_memory:
+            await memory_db.delete(
+                "file_index",
+                {"user_id": str(user.id), "file_path": resolved_path}
+            )
+        else:
+            stale = await FileIndex.find_one(
+                FileIndex.user_id == user.id,
+                FileIndex.file_path == resolved_path
+            )
+            if stale:
+                await stale.delete()
+    except Exception:
+        pass  # Metadata cleanup is best-effort
+
+    return {"success": True, "message": f"Deleted: {os.path.basename(resolved_path)}"}

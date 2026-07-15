@@ -6,11 +6,11 @@ import { cn } from '@/lib/utils';
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info';
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-surface-3 text-gray-400 border border-border',
-  success: 'bg-accent/10 text-accent border border-accent/20',
-  warning: 'bg-warning/10 text-warning border border-warning/20',
-  danger: 'bg-danger/10 text-danger border border-danger/20',
-  info: 'bg-primary/10 text-primary border border-primary/20',
+  default: 'bg-[#181B21] text-[#A1A1AA] border border-white/[0.07]',
+  success: 'bg-[#4ADE80]/10 text-[#4ADE80] border border-[#4ADE80]/20',
+  warning: 'bg-[#FBBF24]/10 text-[#FBBF24] border border-[#FBBF24]/20',
+  danger: 'bg-[#F87171]/10 text-[#F87171] border border-[#F87171]/20',
+  info: 'bg-[#7C3AED]/10 text-[#7C3AED] border border-[#7C3AED]/20',
 };
 
 interface BadgeProps {
@@ -33,9 +33,9 @@ export function Badge({ variant = 'default', children, className }: BadgeProps) 
 
 export function StatusDot({ status, size = 'sm' }: { status: 'healthy' | 'degraded' | 'down'; size?: 'sm' | 'md' }) {
   const colors = {
-    healthy: 'bg-accent',
-    degraded: 'bg-warning',
-    down: 'bg-danger',
+    healthy: 'bg-[#4ADE80]',
+    degraded: 'bg-[#FBBF24]',
+    down: 'bg-[#F87171]',
   };
   const sizes = {
     sm: 'h-1.5 w-1.5',
@@ -48,8 +48,8 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="flex items-start justify-between">
       <div>
-        <h1 className="text-xl font-bold text-foreground">{title}</h1>
-        {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+        <h1 className="text-xl font-bold text-[#F4F4F5]">{title}</h1>
+        {description && <p className="text-xs text-[#71717A] mt-1">{description}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
@@ -60,10 +60,10 @@ export function EmptyState({ icon: Icon, title, description, action }: {
   icon: any; title: string; description: string; action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-      <Icon size={32} className="text-gray-600 mb-3" />
+    <div className="flex flex-col items-center justify-center py-16 text-[#71717A]">
+      <Icon size={32} className="text-[#3F3F46] mb-3" />
       <p className="text-sm font-medium">{title}</p>
-      <p className="text-xs text-gray-600 mt-1 mb-4">{description}</p>
+      <p className="text-xs text-[#3F3F46] mt-1 mb-4">{description}</p>
       {action}
     </div>
   );

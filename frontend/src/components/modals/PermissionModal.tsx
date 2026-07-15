@@ -34,26 +34,26 @@ export function PermissionModal({ permission, onDecision }: PermissionModalProps
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className="fixed top-4 right-4 z-[9999] w-[320px]"
       >
-        <div className="bg-card border border-warning/30 rounded-xl shadow-2xl shadow-black/40 overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/50">
-            <ShieldAlert size={14} className="text-warning shrink-0" />
-            <span className="text-[11px] font-semibold text-foreground truncate">
+        <div className="bg-[#121419] border border-[#FBBF24]/30 rounded-lg shadow-matte-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.07]">
+            <ShieldAlert size={14} className="text-[#FBBF24] shrink-0" />
+            <span className="text-[11px] font-semibold text-[#F4F4F5] truncate">
               {permission.agent_name} — {permission.action}
             </span>
           </div>
           <div className="px-3 py-2">
-            <p className="text-[10px] text-gray-400 truncate">{summary}</p>
+            <p className="text-[10px] text-[#A1A1AA] truncate">{summary}</p>
           </div>
           <div className="flex gap-2 px-3 pb-2.5">
             <button
               onClick={() => onDecision(false)}
-              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 transition cursor-pointer"
+              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-[#F87171]/10 hover:bg-[#F87171]/20 text-[#F87171] border border-[#F87171]/20 transition cursor-pointer"
             >
               Block
             </button>
             <button
               onClick={() => onDecision(true)}
-              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/20 transition cursor-pointer"
+              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-matte transition cursor-pointer"
             >
               Allow
             </button>

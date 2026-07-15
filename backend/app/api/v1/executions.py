@@ -6,6 +6,7 @@ from app.core.database import db_manager
 from app.infrastructure.db.models import WorkflowExecution, TaskLog, User
 from app.infrastructure.memory_db import memory_db
 from app.services.workflow_engine import workflow_engine
+from app.services.process_manager import cancel_process
 from app.api.deps import get_current_user, get_user_id
 
 router = APIRouter()
@@ -103,14 +104,12 @@ async def abort_execution(id: str, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Invalid ID format")
     await _verify_execution_owner(id, get_user_id(user))
 
-    if db_manager.use_memory:
-        await memory_db.update("workflow_executions", {"_id": ObjectId(id)}, {"status": "Cancelled"})
-        return {"success": True, "status": "Cancelled"}
-    execution = await WorkflowExecution.get(ObjectId(id))
-    if not execution:
-        raise HTTPException(status_code=404, detail="Workflow execution not found")
+    # Terminate any tracked subprocess for this execution
+    cancel_process(id)
+
+    # Always go through the engine so the state machine transition + event are published
     try:
         await workflow_engine.abort_execution(id)
-        return {"success": True, "status": "aborting"}
+        return {"success": True, "status": "Cancelled"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

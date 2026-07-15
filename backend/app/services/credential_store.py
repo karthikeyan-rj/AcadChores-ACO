@@ -48,10 +48,26 @@ def mask_api_key(api_key: str) -> str:
 async def save_api_key(user_id: str, provider: str, api_key: str) -> dict:
     from app.core.database import db_manager
 
-    db = db_manager.db
     encrypted = encrypt_api_key(api_key)
     hint = mask_api_key(api_key)
 
+    if db_manager.use_memory:
+        from app.infrastructure.memory_db import memory_db
+        existing = await memory_db.find_one("user_api_keys", {"user_id": str(user_id), "provider": provider})
+        if existing:
+            await memory_db.update("user_api_keys",
+                                   {"user_id": str(user_id), "provider": provider},
+                                   {"encrypted_key": encrypted, "key_hint": hint})
+        else:
+            await memory_db.insert("user_api_keys", {
+                "user_id": str(user_id),
+                "provider": provider,
+                "encrypted_key": encrypted,
+                "key_hint": hint,
+            })
+        return {"provider": provider, "key_hint": hint}
+
+    db = db_manager.db
     existing = await db.user_api_keys.find_one({"user_id": str(user_id), "provider": provider})
     if existing:
         await db.user_api_keys.update_one(
@@ -73,6 +89,17 @@ async def save_api_key(user_id: str, provider: str, api_key: str) -> dict:
 async def get_api_key(user_id: str, provider: str) -> Optional[str]:
     from app.core.database import db_manager
 
+    if db_manager.use_memory:
+        from app.infrastructure.memory_db import memory_db
+        doc = await memory_db.find_one("user_api_keys", {"user_id": str(user_id), "provider": provider})
+        if not doc:
+            return None
+        try:
+            return decrypt_api_key(doc["encrypted_key"])
+        except Exception as e:
+            logger.error(f"Failed to decrypt API key for provider {provider}: {e}")
+            return None
+
     db = db_manager.db
     doc = await db.user_api_keys.find_one({"user_id": str(user_id), "provider": provider})
     if not doc:
@@ -87,6 +114,13 @@ async def get_api_key(user_id: str, provider: str) -> Optional[str]:
 async def get_api_key_hint(user_id: str, provider: str) -> Optional[str]:
     from app.core.database import db_manager
 
+    if db_manager.use_memory:
+        from app.infrastructure.memory_db import memory_db
+        doc = await memory_db.find_one("user_api_keys", {"user_id": str(user_id), "provider": provider})
+        if not doc:
+            return None
+        return doc.get("key_hint", "")
+
     db = db_manager.db
     doc = await db.user_api_keys.find_one({"user_id": str(user_id), "provider": provider})
     if not doc:
@@ -97,6 +131,10 @@ async def get_api_key_hint(user_id: str, provider: str) -> Optional[str]:
 async def delete_api_key(user_id: str, provider: str) -> bool:
     from app.core.database import db_manager
 
+    if db_manager.use_memory:
+        from app.infrastructure.memory_db import memory_db
+        return await memory_db.delete("user_api_keys", {"user_id": str(user_id), "provider": provider})
+
     db = db_manager.db
     result = await db.user_api_keys.delete_one({"user_id": str(user_id), "provider": provider})
     return result.deleted_count > 0
@@ -104,6 +142,11 @@ async def delete_api_key(user_id: str, provider: str) -> bool:
 
 async def list_api_keys(user_id: str) -> list:
     from app.core.database import db_manager
+
+    if db_manager.use_memory:
+        from app.infrastructure.memory_db import memory_db
+        docs = await memory_db.find("user_api_keys", {"user_id": str(user_id)})
+        return [{"provider": d["provider"], "key_hint": d.get("key_hint", "")} for d in docs]
 
     db = db_manager.db
     cursor = db.user_api_keys.find({"user_id": str(user_id)}, {"encrypted_key": 0})

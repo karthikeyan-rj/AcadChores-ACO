@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { History, Search, LayoutGrid, List, Table as TableIcon, Clock, CheckCircle2, Download, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
-import { cn, formatRelativeTime, formatDuration, statusColor } from '@/lib/utils';
+import { cn, formatRelativeTime, formatDuration, statusColor, statusBg } from '@/lib/utils';
 import { useExecutions } from '@/lib/hooks';
 import { SkeletonTable, SkeletonList } from '@/components/ui/Skeleton';
 
@@ -55,38 +55,42 @@ export default function HistoryPage() {
     URL.revokeObjectURL(url);
   };
 
+  const isRunning = (status: string) => status === 'executing' || status === 'running';
+
   return (
     <div className="p-6 space-y-5 max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Execution History</h1>
-          <p className="text-xs text-gray-500 mt-0.5">{filtered.length} executions{filter !== 'All' ? ` (${filter})` : ''}</p>
+          <h1 className="text-xl font-bold text-[#F4F4F5]">Execution History</h1>
+          <p className="text-xs text-[#71717A] mt-0.5">{filtered.length} executions{filter !== 'All' ? ` (${filter})` : ''}</p>
         </div>
         <button onClick={handleExport} disabled={filtered.length === 0}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-gray-400 hover:text-foreground transition cursor-pointer disabled:opacity-50">
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#181B21] border border-white/[0.07] text-xs text-[#71717A] hover:text-[#A1A1AA] transition cursor-pointer disabled:opacity-50">
           <Download size={13} />Export CSV
         </button>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
           <input type="text" placeholder="Search history..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs bg-surface-2 border border-border rounded-lg outline-none focus:border-primary transition" />
+            className="w-full pl-9 pr-4 py-2 text-xs bg-[#0D0F12] border border-white/[0.07] rounded-lg text-[#F4F4F5] placeholder:text-[#71717A] outline-none focus:border-[#7C3AED]/40 transition" />
         </div>
         <div className="flex gap-1">
           {filters.map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={cn('px-3 py-1.5 rounded-lg text-[11px] font-medium transition cursor-pointer border',
-                filter === f ? 'bg-primary/10 text-primary border-primary/30' : 'bg-surface-2 border-border text-gray-400 hover:text-foreground')}>
+                filter === f
+                  ? 'bg-[#7C3AED]/12 text-[#7C3AED] border-[#7C3AED]/30'
+                  : 'bg-[#181B21] border-white/[0.07] text-[#71717A] hover:text-[#A1A1AA]')}>
               {f}
             </button>
           ))}
         </div>
-        <div className="flex gap-0.5 bg-surface-2 border border-border rounded-lg p-0.5">
+        <div className="flex gap-0.5 bg-[#181B21] border border-white/[0.07] rounded-lg p-0.5">
           {([['cards', LayoutGrid], ['timeline', List], ['table', TableIcon]] as [ViewMode, any][]).map(([v, Icon]) => (
             <button key={v} onClick={() => setView(v)}
-              className={cn('p-1.5 rounded-md transition cursor-pointer', view === v ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:text-foreground')}>
+              className={cn('p-1.5 rounded-md transition cursor-pointer', view === v ? 'bg-[#7C3AED]/12 text-[#7C3AED]' : 'text-[#71717A] hover:text-[#A1A1AA]')}>
               <Icon size={14} />
             </button>
           ))}
@@ -94,58 +98,93 @@ export default function HistoryPage() {
       </div>
 
       {loading ? (
-        view === 'table' ? <SkeletonTable /> : <SkeletonList rows={4} />
+        view === 'table' ? (
+          <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] overflow-hidden animate-pulse">
+            <div className="bg-[#0D0F12] px-4 py-2.5 flex gap-4">
+              {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-3 flex-1 bg-[#181B21] rounded" />)}
+            </div>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="px-4 py-3 flex gap-4 border-t border-white/[0.05]">
+                {[1, 2, 3, 4, 5].map(j => <div key={j} className="h-3 flex-1 bg-[#181B21] rounded" />)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-4 space-y-3 animate-pulse">
+                <div className="h-3 w-16 bg-[#181B21] rounded" />
+                <div className="h-4 w-3/4 bg-[#181B21] rounded" />
+                <div className="flex gap-3">
+                  <div className="h-3 w-20 bg-[#181B21] rounded" />
+                  <div className="h-3 w-14 bg-[#181B21] rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-          <History size={32} className="text-gray-600 mb-3" />
-          <p className="text-sm font-medium">No execution history</p>
-          <p className="text-xs text-gray-600 mt-1 mb-4">
+        <div className="flex flex-col items-center justify-center py-16">
+          <History size={32} className="text-[#71717A] mb-3" />
+          <p className="text-sm font-medium text-[#A1A1AA]">No execution history</p>
+          <p className="text-xs text-[#71717A] mt-1 mb-4">
             {search ? 'No results match your search' : 'Run a workflow to see results here'}
           </p>
           <button onClick={() => router.push('/chat')}
-            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-xl transition cursor-pointer">
+            className="flex items-center gap-2 px-4 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold rounded-lg transition cursor-pointer">
             <RotateCcw size={13} />Create Workflow
           </button>
         </div>
       ) : view === 'table' ? (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] overflow-hidden">
           <table className="w-full text-xs">
-            <thead><tr className="border-b border-border text-gray-500">
-              <th className="text-left px-4 py-2.5 font-medium">Status</th>
-              <th className="text-left px-4 py-2.5 font-medium">Description</th>
-              <th className="text-left px-4 py-2.5 font-medium">Steps</th>
-              <th className="text-left px-4 py-2.5 font-medium">Duration</th>
-              <th className="text-left px-4 py-2.5 font-medium">Time</th>
+            <thead><tr className="border-b border-white/[0.07] bg-[#0D0F12]">
+              <th className="text-left px-4 py-2.5 font-medium text-[#71717A]">Status</th>
+              <th className="text-left px-4 py-2.5 font-medium text-[#71717A]">Description</th>
+              <th className="text-left px-4 py-2.5 font-medium text-[#71717A]">Steps</th>
+              <th className="text-left px-4 py-2.5 font-medium text-[#71717A]">Duration</th>
+              <th className="text-left px-4 py-2.5 font-medium text-[#71717A]">Time</th>
             </tr></thead>
             <tbody>
               {paginated.map((ex) => (
-                <tr key={ex._id} className="border-b border-border/50 hover:bg-surface-2 transition group">
-                  <td className="px-4 py-2.5"><span className={cn('font-semibold uppercase', statusColor(ex.status))}>{ex.status}</span></td>
-                  <td className="px-4 py-2.5 truncate max-w-[300px]">{ex.description || ex.title}</td>
-                  <td className="px-4 py-2.5 text-gray-400">{ex.current_step_index}/{ex.total_steps}</td>
-                  <td className="px-4 py-2.5 text-accent font-mono">{ex.completed_at ? formatDuration(ex.started_at, ex.completed_at) : '—'}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{formatRelativeTime(ex.started_at)}</td>
+                <tr key={ex._id} onClick={() => router.push('/chat')}
+                  className="border-t border-white/[0.05] hover:bg-white/[0.02] transition cursor-pointer group">
+                  <td className="px-4 py-2.5">
+                    <span className={cn(
+                      'font-semibold uppercase px-2 py-0.5 rounded',
+                      isRunning(ex.status) ? 'bg-[#ADFF2F]/10 text-[#ADFF2F]' : cn(statusBg(ex.status), statusColor(ex.status))
+                    )}>{ex.status}</span>
+                  </td>
+                  <td className="px-4 py-2.5 truncate max-w-[300px] text-[#F4F4F5]">{ex.description || ex.title}</td>
+                  <td className="px-4 py-2.5 text-[#71717A]">{ex.current_step_index}/{ex.total_steps}</td>
+                  <td className="px-4 py-2.5 text-[#4ADE80] font-mono">{ex.completed_at ? formatDuration(ex.started_at, ex.completed_at) : '—'}</td>
+                  <td className="px-4 py-2.5 text-[#71717A]">{formatRelativeTime(ex.started_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : view === 'timeline' ? (
-        <div className="space-y-0 pl-4 border-l border-border">
+        <div className="space-y-0 pl-4 border-l border-white/[0.07]">
           {paginated.map((ex, i) => (
             <motion.div key={ex._id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
               className="relative pl-6 pb-6 cursor-pointer group" onClick={() => router.push('/chat')}>
-              <span className={cn('absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-background flex items-center justify-center',
-                ex.status === 'completed' ? 'bg-accent' : ex.status === 'Failed' ? 'bg-danger' : 'bg-primary')}>
-                {ex.status === 'completed' ? <CheckCircle2 size={10} className="text-white" /> : <Clock size={10} className="text-white" />}
+              <span className={cn(
+                'absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-[#08090B] flex items-center justify-center',
+                isRunning(ex.status) ? 'bg-[#ADFF2F]' : ex.status === 'completed' ? 'bg-[#4ADE80]' : ex.status === 'failed' ? 'bg-[#F87171]' : 'bg-[#7C3AED]'
+              )}>
+                {ex.status === 'completed' ? <CheckCircle2 size={10} className="text-[#08090B]" /> : <Clock size={10} className="text-[#08090B]" />}
               </span>
-              <div className="rounded-lg border border-border bg-card p-3 hover:bg-card-hover transition">
+              <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-3 hover:bg-[#181B21] transition">
                 <div className="flex items-center justify-between mb-1">
-                  <span className={cn('text-[10px] font-semibold uppercase', statusColor(ex.status))}>{ex.status}</span>
-                  <span className="text-[10px] text-gray-500">{formatRelativeTime(ex.started_at)}</span>
+                  <span className={cn(
+                    'text-[10px] font-semibold uppercase px-2 py-0.5 rounded',
+                    isRunning(ex.status) ? 'bg-[#ADFF2F]/10 text-[#ADFF2F]' : cn(statusBg(ex.status), statusColor(ex.status))
+                  )}>{ex.status}</span>
+                  <span className="text-[10px] text-[#71717A]">{formatRelativeTime(ex.started_at)}</span>
                 </div>
-                <p className="text-xs font-medium truncate">{ex.description || ex.title}</p>
-                {ex.completed_at && <p className="text-[10px] text-accent mt-1 font-mono">{formatDuration(ex.started_at, ex.completed_at)}</p>}
+                <p className="text-xs font-medium truncate text-[#F4F4F5]">{ex.description || ex.title}</p>
+                {ex.completed_at && <p className="text-[10px] text-[#4ADE80] mt-1 font-mono">{formatDuration(ex.started_at, ex.completed_at)}</p>}
               </div>
             </motion.div>
           ))}
@@ -155,15 +194,18 @@ export default function HistoryPage() {
           {paginated.map((ex, i) => (
             <motion.div key={ex._id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
               onClick={() => router.push('/chat')}
-              className="rounded-xl border border-border bg-card hover:bg-card-hover transition p-4 cursor-pointer">
+              className="rounded-[14px] border border-white/[0.07] bg-[#121419] hover:bg-[#181B21] transition p-4 cursor-pointer">
               <div className="flex items-center justify-between mb-2">
-                <span className={cn('text-[10px] font-semibold uppercase', statusColor(ex.status))}>{ex.status}</span>
-                <span className="text-[10px] text-gray-500">{formatRelativeTime(ex.started_at)}</span>
+                <span className={cn(
+                  'text-[10px] font-semibold uppercase px-2 py-0.5 rounded',
+                  isRunning(ex.status) ? 'bg-[#ADFF2F]/10 text-[#ADFF2F]' : cn(statusBg(ex.status), statusColor(ex.status))
+                )}>{ex.status}</span>
+                <span className="text-[10px] text-[#71717A]">{formatRelativeTime(ex.started_at)}</span>
               </div>
-              <p className="text-xs font-medium truncate mb-2">{ex.description || ex.title}</p>
-              <div className="flex items-center gap-3 text-[10px] text-gray-500">
+              <p className="text-xs font-medium truncate mb-2 text-[#F4F4F5]">{ex.description || ex.title}</p>
+              <div className="flex items-center gap-3 text-[10px] text-[#71717A]">
                 <span>{ex.current_step_index}/{ex.total_steps} steps</span>
-                {ex.completed_at && <span className="text-accent font-mono">{formatDuration(ex.started_at, ex.completed_at)}</span>}
+                {ex.completed_at && <span className="text-[#4ADE80] font-mono">{formatDuration(ex.started_at, ex.completed_at)}</span>}
               </div>
             </motion.div>
           ))}
@@ -172,27 +214,29 @@ export default function HistoryPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4 border-t border-border">
-          <p className="text-[10px] text-gray-500">
+        <div className="flex items-center justify-between pt-4 border-t border-white/[0.07]">
+          <p className="text-[10px] text-[#71717A]">
             Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
           </p>
           <div className="flex items-center gap-1">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="p-1.5 rounded-lg hover:bg-surface-2 disabled:opacity-30 transition cursor-pointer text-gray-400">
+              className="p-1.5 rounded-lg bg-[#181B21] hover:bg-[#181B21]/80 disabled:opacity-30 transition cursor-pointer text-[#71717A] border border-white/[0.07]">
               <ChevronLeft size={14} />
             </button>
             {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
               const pageNum = i + 1;
               return (
                 <button key={pageNum} onClick={() => setPage(pageNum)}
-                  className={cn('w-7 h-7 rounded-lg text-[11px] font-medium transition cursor-pointer',
-                    page === pageNum ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:bg-surface-2')}>
+                  className={cn('w-7 h-7 rounded-lg text-[11px] font-medium transition cursor-pointer border',
+                    page === pageNum
+                      ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                      : 'bg-[#181B21] border-white/[0.07] text-[#71717A] hover:text-[#A1A1AA]')}>
                   {pageNum}
                 </button>
               );
             })}
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="p-1.5 rounded-lg hover:bg-surface-2 disabled:opacity-30 transition cursor-pointer text-gray-400">
+              className="p-1.5 rounded-lg bg-[#181B21] hover:bg-[#181B21]/80 disabled:opacity-30 transition cursor-pointer text-[#71717A] border border-white/[0.07]">
               <ChevronRight size={14} />
             </button>
           </div>

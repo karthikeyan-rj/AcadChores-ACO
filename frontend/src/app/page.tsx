@@ -58,9 +58,9 @@ function FadeIn({ children, className = '', delay = 0 }: { children: React.React
 function SectionHeading({ label, title, desc }: { label: string; title: string; desc?: string }) {
   return (
     <FadeIn className="text-center mb-16">
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-primary mb-3">{label}</p>
-      <h2 className="text-3xl md:text-5xl font-bold text-[#e8e8ec]">{title}</h2>
-      {desc && <p className="mt-4 text-gray-500 max-w-lg mx-auto text-sm">{desc}</p>}
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-[#7C3AED] mb-3">{label}</p>
+      <h2 className="text-3xl md:text-5xl font-bold text-[#F4F4F5]">{title}</h2>
+      {desc && <p className="mt-4 text-[#71717A] max-w-lg mx-auto text-sm">{desc}</p>}
     </FadeIn>
   );
 }
@@ -88,20 +88,20 @@ function Navbar() {
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.3 }}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-[#0c0c10] border-b border-[#1e1f2a]' : 'bg-transparent'
+        scrolled ? 'bg-[#08090B]/80 backdrop-blur-xl border-b border-white/[0.07]' : 'bg-transparent'
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <a href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Cpu size={16} className="text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-[#7C3AED]/10 flex items-center justify-center">
+            <Cpu size={16} className="text-[#7C3AED]" />
           </div>
-          <span className="font-bold text-base text-[#e8e8ec]">ACO</span>
+          <span className="font-bold text-base text-[#F4F4F5]">ACO</span>
         </a>
 
         <nav className="hidden md:flex items-center gap-8">
           {links.map(l => (
-            <a key={l.href} href={l.href} className="text-[13px] text-gray-500 hover:text-[#e8e8ec] transition-colors duration-200">
+            <a key={l.href} href={l.href} className="text-[13px] text-[#71717A] hover:text-[#F4F4F5] transition-colors duration-200">
               {l.label}
             </a>
           ))}
@@ -109,16 +109,16 @@ function Navbar() {
 
         <div className="hidden md:flex items-center gap-3">
           <a href="/login"
-            className="text-[13px] text-gray-500 hover:text-[#e8e8ec] transition-colors px-3 py-1.5">
+            className="text-[13px] text-[#71717A] hover:text-[#F4F4F5] transition-colors px-3 py-1.5">
             Sign In
           </a>
           <a href="/login"
-            className="text-[13px] font-medium bg-primary hover:bg-primary-hover text-white px-4 py-1.5 rounded-lg transition-all duration-200">
+            className="text-[13px] font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-4 py-1.5 rounded-lg transition-all duration-200">
             Get Started
           </a>
         </div>
 
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden text-gray-500 hover:text-[#e8e8ec]">
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden text-[#71717A] hover:text-[#F4F4F5]">
           {mobileOpen ? <XIcon size={20} /> : <Menu size={20} />}
         </button>
       </div>
@@ -129,18 +129,18 @@ function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-[#0c0c10] border-b border-[#1e1f2a] overflow-hidden"
+            className="md:hidden bg-[#08090B]/95 backdrop-blur-xl border-b border-white/[0.07] overflow-hidden"
           >
             <div className="px-6 py-4 space-y-3">
               {links.map(l => (
                 <a key={l.href} href={l.href} onClick={() => setMobileOpen(false)}
-                  className="block text-sm text-gray-500 hover:text-[#e8e8ec] transition-colors py-2">
+                  className="block text-sm text-[#71717A] hover:text-[#F4F4F5] transition-colors py-2">
                   {l.label}
                 </a>
               ))}
-              <div className="pt-3 border-t border-[#1e1f2a] flex flex-col gap-2">
-                <a href="/login" className="text-sm text-gray-500 hover:text-[#e8e8ec] py-2">Sign In</a>
-                <a href="/login" className="text-sm font-medium bg-primary text-white px-4 py-2.5 rounded-lg text-center">Get Started</a>
+              <div className="pt-3 border-t border-white/[0.07] flex flex-col gap-2">
+                <a href="/login" className="text-sm text-[#71717A] hover:text-[#F4F4F5] py-2">Sign In</a>
+                <a href="/login" className="text-sm font-medium bg-[#7C3AED] text-white px-4 py-2.5 rounded-lg text-center">Get Started</a>
               </div>
             </div>
           </motion.div>
@@ -153,7 +153,13 @@ function Navbar() {
 /* ─── HERO ─── */
 function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center pt-24 pb-20 px-6 overflow-hidden bg-[#0c0c10]">
+    <section className="relative min-h-screen flex flex-col items-center justify-center pt-24 pb-20 px-6 overflow-hidden bg-[#08090B]">
+      {/* Subtle organic background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#7C3AED]/[0.03] blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-[#7C3AED]/[0.02] blur-[100px]" />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -164,28 +170,28 @@ function Hero() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#272836] bg-[#14151c] mb-8"
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/[0.07] bg-[#121419]/50 mb-8"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          <span className="text-[11px] font-medium text-primary">v1.0 — Now Available</span>
+          <span className="h-1.5 w-1.5 rounded-full bg-[#ADFF2F]" />
+          <span className="text-[11px] font-medium text-[#A1A1AA]">v1.0 — Now Available</span>
         </motion.div>
 
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-[#e8e8ec] leading-[1.05]"
+          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-[#F4F4F5] leading-[1.05]"
         >
-          Your Autonomous
+          Autonomous
           <br />
-          <span className="text-[#e8e8ec]">Computer Operator</span>
+          Computer Operator
         </motion.h1>
 
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="mt-6 text-base md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed"
+          className="mt-6 text-base md:text-lg text-[#71717A] max-w-2xl mx-auto leading-relaxed"
         >
           An autonomous AI agent that understands goals, plans workflows, and operates your computer securely.
           Browse websites, automate tasks, manage files, and execute commands — all from natural language.
@@ -198,11 +204,11 @@ function Hero() {
           className="mt-10 flex flex-wrap items-center justify-center gap-4"
         >
           <a href="/login"
-            className="flex items-center gap-2 bg-primary hover:opacity-90 text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
+            className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
             Get Started <ArrowRight size={16} />
           </a>
           <a href="#features"
-            className="flex items-center gap-2 bg-[#14151c] hover:bg-[#181922] text-[#e8e8ec] px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 border border-[#1e1f2a] hover:border-[#272836]">
+            className="flex items-center gap-2 bg-[#121419] hover:bg-[#181B21] text-[#F4F4F5] px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 border border-white/[0.07] hover:border-white/[0.12]">
             Learn More
           </a>
         </motion.div>
@@ -214,34 +220,34 @@ function Hero() {
           transition={{ delay: 0.5 }}
           className="mt-16 max-w-xl mx-auto"
         >
-          <div className="rounded-2xl border border-[#1e1f2a] bg-[#14151c] overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#1e1f2a]">
+          <div className="rounded-2xl border border-white/[0.07] bg-[#121419] overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.07]">
               <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-gray-600" />
-                <div className="w-2.5 h-2.5 rounded-full bg-gray-600" />
-                <div className="w-2.5 h-2.5 rounded-full bg-gray-600" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#71717A]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#71717A]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#71717A]" />
               </div>
-              <span className="text-[10px] text-gray-600 ml-2 font-mono">ACO Terminal</span>
+              <span className="text-[10px] text-[#71717A] ml-2 font-mono">ACO Terminal</span>
             </div>
             <div className="p-5 font-mono text-sm">
-              <div className="flex items-center gap-2 text-gray-600 mb-3">
-                <Sparkles size={12} className="text-primary" />
+              <div className="flex items-center gap-2 text-[#71717A] mb-3">
+                <Sparkles size={12} className="text-[#7C3AED]" />
                 <span className="text-[11px]">Tell ACO what to do...</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-primary">$</span>
-                <span className="text-[#e8e8ec]">Summarize today's AI news</span>
+                <span className="text-[#7C3AED]">$</span>
+                <span className="text-[#F4F4F5]">Summarize today's AI news</span>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181922] border border-[#272836] text-gray-400 text-[10px]">
-                  <Globe size={10} className="text-gray-400" />
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[#A1A1AA] text-[10px]">
+                  <Globe size={10} />
                   Browse web
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181922] border border-[#272836] text-gray-400 text-[10px]">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[#A1A1AA] text-[10px]">
                   <MailIcon size={10} />
                   Send email
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181922] border border-[#272836] text-gray-400 text-[10px]">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[#A1A1AA] text-[10px]">
                   <FileText size={10} />
                   Organize files
                 </div>
@@ -266,9 +272,9 @@ function Hero() {
           ].map((a) => (
             <div
               key={a.label}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#1e1f2a] bg-[#14151c] text-[11px] text-gray-500"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/[0.07] bg-[#121419]/50 text-[11px] text-[#A1A1AA]"
             >
-              <a.icon size={12} className="text-gray-400" />
+              <a.icon size={12} className="text-[#A1A1AA]" />
               {a.label}
             </div>
           ))}
@@ -280,7 +286,7 @@ function Hero() {
 
 function MailIcon({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#A1A1AA]">
       <rect width="20" height="16" x="2" y="4" rx="2" />
       <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
     </svg>
@@ -320,13 +326,13 @@ function Features() {
               <motion.div
                 key={i}
                 variants={fadeUp}
-                className="p-5 rounded-2xl border border-[#1e1f2a] bg-[#14151c] hover:bg-[#181922] hover:border-[#272836] transition-all duration-300"
+                className="p-5 rounded-2xl border border-white/[0.07] bg-[#121419] hover:bg-[#181B21] hover:border-white/[0.12] transition-all duration-200"
               >
-                <div className="w-10 h-10 rounded-xl bg-[#181922] border border-[#272836] flex items-center justify-center mb-4">
-                  <Icon size={18} className="text-gray-400" />
+                <div className="w-10 h-10 rounded-xl bg-[#181B21] border border-white/[0.07] flex items-center justify-center mb-4">
+                  <Icon size={18} className="text-[#A1A1AA]" />
                 </div>
-                <h3 className="text-sm font-semibold text-[#e8e8ec] mb-1.5">{f.title}</h3>
-                <p className="text-[12px] text-gray-500 leading-relaxed">{f.desc}</p>
+                <h3 className="text-sm font-semibold text-[#F4F4F5] mb-1.5">{f.title}</h3>
+                <p className="text-[12px] text-[#71717A] leading-relaxed">{f.desc}</p>
               </motion.div>
             );
           })}
@@ -348,12 +354,12 @@ function HowItWorks() {
   ];
 
   return (
-    <Section className="py-32 px-6 bg-[#101118]">
+    <Section className="py-32 px-6 bg-[#0D0F12]">
       <div className="max-w-3xl mx-auto">
         <SectionHeading label="How It Works" title="From intent to execution" />
 
         <div className="relative">
-          <div className="absolute left-[19px] top-8 bottom-8 w-px bg-[#1e1f2a]" />
+          <div className="absolute left-[19px] top-8 bottom-8 w-px bg-white/[0.07]" />
 
           <div className="space-y-1">
             {steps.map((s, i) => {
@@ -367,15 +373,15 @@ function HowItWorks() {
                   transition={{ delay: i * 0.08 }}
                   className="flex items-start gap-5 py-4 group"
                 >
-                  <div className="relative z-10 w-10 h-10 rounded-xl bg-[#14151c] border border-[#1e1f2a] flex items-center justify-center shrink-0 group-hover:border-[#272836] transition-colors">
-                    <Icon size={16} className="text-gray-400" />
+                  <div className="relative z-10 w-10 h-10 rounded-xl bg-[#121419] border border-white/[0.07] flex items-center justify-center shrink-0 group-hover:border-white/[0.12] transition-colors">
+                    <Icon size={16} className="text-[#A1A1AA]" />
                   </div>
                   <div className="pt-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <span className="text-[10px] font-mono text-gray-600">{s.num}</span>
-                      <h3 className="text-sm font-semibold text-[#e8e8ec]">{s.title}</h3>
+                      <span className="text-[10px] font-mono text-[#71717A]">{s.num}</span>
+                      <h3 className="text-sm font-semibold text-[#F4F4F5]">{s.title}</h3>
                     </div>
-                    <p className="text-[13px] text-gray-500">{s.desc}</p>
+                    <p className="text-[13px] text-[#71717A]">{s.desc}</p>
                   </div>
                 </motion.div>
               );
@@ -417,7 +423,7 @@ function Architecture() {
         <SectionHeading label="Architecture" title="Built for reliability" desc="A layered architecture designed for extensibility, fault tolerance, and performance." />
 
         <FadeIn>
-          <div className="relative p-8 rounded-3xl border border-[#1e1f2a] bg-[#14151c]">
+          <div className="relative p-8 rounded-3xl border border-white/[0.07] bg-[#121419]">
             <div className="space-y-3">
               {layers.map((l, i) => {
                 const Icon = l.icon;
@@ -428,17 +434,17 @@ function Architecture() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.08 }}
-                    className="flex items-center gap-4 px-5 py-3 rounded-xl border border-[#1e1f2a] bg-[#101118] hover:border-[#272836] transition-colors"
+                    className="flex items-center gap-4 px-5 py-3 rounded-xl border border-white/[0.07] bg-[#0D0F12] hover:border-white/[0.12] transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-[#181922] flex items-center justify-center text-gray-400">
+                    <div className="w-8 h-8 rounded-lg bg-[#181B21] flex items-center justify-center text-[#A1A1AA]">
                       <Icon size={16} />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-[#e8e8ec]">{l.label}</p>
-                      <p className="text-[11px] text-gray-500">{l.sub}</p>
+                      <p className="text-sm font-medium text-[#F4F4F5]">{l.label}</p>
+                      <p className="text-[11px] text-[#71717A]">{l.sub}</p>
                     </div>
                     {i < layers.length - 1 && (
-                      <ChevronDown size={14} className="text-gray-600" />
+                      <ChevronDown size={14} className="text-[#71717A]" />
                     )}
                   </motion.div>
                 );
@@ -446,9 +452,9 @@ function Architecture() {
             </div>
 
             <div className="mt-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-[#1e1f2a]" />
-              <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider shrink-0">Agent Pool</span>
-              <div className="h-px flex-1 bg-[#1e1f2a]" />
+              <div className="h-px flex-1 bg-white/[0.07]" />
+              <span className="text-[10px] font-medium text-[#71717A] uppercase tracking-wider shrink-0">Agent Pool</span>
+              <div className="h-px flex-1 bg-white/[0.07]" />
             </div>
 
             <div className="mt-4 grid grid-cols-5 gap-3">
@@ -457,29 +463,29 @@ function Architecture() {
                 return (
                   <motion.div
                     key={i}
-                    className="flex flex-col items-center gap-2 p-3 rounded-xl border border-[#1e1f2a] bg-[#101118] hover:border-[#272836] hover:bg-[#181922] transition-all"
+                    className="flex flex-col items-center gap-2 p-3 rounded-xl border border-white/[0.07] bg-[#0D0F12] hover:border-white/[0.12] hover:bg-[#181B21] transition-all"
                   >
-                    <Icon size={18} className="text-gray-400" />
-                    <span className="text-[11px] text-gray-500">{a.label}</span>
+                    <Icon size={18} className="text-[#A1A1AA]" />
+                    <span className="text-[11px] text-[#71717A]">{a.label}</span>
                   </motion.div>
                 );
               })}
             </div>
 
             <div className="mt-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-[#1e1f2a]" />
-              <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider shrink-0">Post-Processing</span>
-              <div className="h-px flex-1 bg-[#1e1f2a]" />
+              <div className="h-px flex-1 bg-white/[0.07]" />
+              <span className="text-[10px] font-medium text-[#71717A] uppercase tracking-wider shrink-0">Post-Processing</span>
+              <div className="h-px flex-1 bg-white/[0.07]" />
             </div>
 
             <div className="mt-4 space-y-2">
               {postSteps.map((s, i) => {
                 const Icon = s.icon;
                 return (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-[#1e1f2a] bg-[#101118]">
-                    <Icon size={14} className="text-gray-400" />
-                    <span className="text-xs font-medium text-[#e8e8ec]">{s.label}</span>
-                    {i < postSteps.length - 1 && <ChevronDown size={12} className="text-gray-600 ml-auto" />}
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-white/[0.07] bg-[#0D0F12]">
+                    <Icon size={14} className="text-[#A1A1AA]" />
+                    <span className="text-xs font-medium text-[#F4F4F5]">{s.label}</span>
+                    {i < postSteps.length - 1 && <ChevronDown size={12} className="text-[#71717A] ml-auto" />}
                   </div>
                 );
               })}
@@ -505,7 +511,7 @@ function Security() {
   ];
 
   return (
-    <Section className="py-32 px-6 bg-[#101118]" id="security">
+    <Section className="py-32 px-6 bg-[#0D0F12]" id="security">
       <div className="max-w-6xl mx-auto">
         <SectionHeading label="Security" title="Built to be safe" desc="Security is not an afterthought. Every layer is designed with privacy and safety in mind." />
 
@@ -516,13 +522,13 @@ function Security() {
               <motion.div
                 key={i}
                 variants={fadeUp}
-                className="p-5 rounded-2xl border border-[#1e1f2a] bg-[#14151c] hover:bg-[#181922] hover:border-[#272836] transition-all duration-300"
+                className="p-5 rounded-2xl border border-white/[0.07] bg-[#121419] hover:bg-[#181B21] hover:border-white/[0.12] transition-all duration-200"
               >
-                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
-                  <Icon size={18} className="text-primary" />
+                <div className="w-10 h-10 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/20 flex items-center justify-center mb-4">
+                  <Icon size={18} className="text-[#7C3AED]" />
                 </div>
-                <h3 className="text-sm font-semibold text-[#e8e8ec] mb-1.5">{item.title}</h3>
-                <p className="text-[12px] text-gray-500 leading-relaxed">{item.desc}</p>
+                <h3 className="text-sm font-semibold text-[#F4F4F5] mb-1.5">{item.title}</h3>
+                <p className="text-[12px] text-[#71717A] leading-relaxed">{item.desc}</p>
               </motion.div>
             );
           })}
@@ -558,14 +564,14 @@ function FAQ() {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="rounded-xl border border-[#1e1f2a] bg-[#14151c] overflow-hidden"
+              className="rounded-xl border border-white/[0.07] bg-[#121419] overflow-hidden"
             >
               <button
                 onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[#181922] transition-colors"
+                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[#181B21] transition-colors"
               >
-                <span className="text-sm font-medium text-[#e8e8ec]">{faq.q}</span>
-                <ChevronDown size={14} className={`text-gray-500 transition-transform duration-200 shrink-0 ml-4 ${
+                <span className="text-sm font-medium text-[#F4F4F5]">{faq.q}</span>
+                <ChevronDown size={14} className={`text-[#71717A] transition-transform duration-200 shrink-0 ml-4 ${
                   openIdx === i ? 'rotate-180' : ''
                 }`} />
               </button>
@@ -578,7 +584,7 @@ function FAQ() {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <p className="px-5 pb-4 text-[13px] text-gray-500 leading-relaxed">{faq.a}</p>
+                    <p className="px-5 pb-4 text-[13px] text-[#71717A] leading-relaxed">{faq.a}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -593,29 +599,36 @@ function FAQ() {
 /* ─── CTA ─── */
 function CTA() {
   return (
-    <section className="py-32 px-6 bg-[#101118]">
+    <section className="py-32 px-6 bg-[#0D0F12]">
       <div className="max-w-3xl mx-auto text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="relative p-12 rounded-3xl border border-[#1e1f2a] bg-[#14151c]"
+          className="relative p-12 rounded-3xl border border-white/[0.07] bg-[#121419]"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-[#e8e8ec] mb-4">
-            Ready to automate?
-          </h2>
-          <p className="text-gray-500 text-sm mb-8 max-w-md mx-auto">
-            Start building autonomous workflows today. Open source, local-first, and free.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <a href="/login"
-              className="flex items-center gap-2 bg-primary hover:opacity-90 text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
-              Get Started <ArrowRight size={16} />
-            </a>
-            <a href="#features"
-              className="flex items-center gap-2 bg-[#181922] hover:bg-[#1e1f2a] text-[#e8e8ec] px-6 py-3 rounded-xl text-sm font-medium transition-all border border-[#272836]">
-              Learn More
-            </a>
+          {/* Subtle radial glow */}
+          <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] rounded-full bg-[#7C3AED]/[0.05] blur-[80px]" />
+          </div>
+          
+          <div className="relative z-10">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#F4F4F5] mb-4">
+              Ready to automate?
+            </h2>
+            <p className="text-[#71717A] text-sm mb-8 max-w-md mx-auto">
+              Start building autonomous workflows today. Open source, local-first, and free.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <a href="/login"
+                className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
+                Get Started <ArrowRight size={16} />
+              </a>
+              <a href="#features"
+                className="flex items-center gap-2 bg-[#181B21] hover:bg-[#0D0F12] text-[#F4F4F5] px-6 py-3 rounded-xl text-sm font-medium transition-all border border-white/[0.07]">
+                Learn More
+              </a>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -626,46 +639,46 @@ function CTA() {
 /* ─── FOOTER ─── */
 function Footer() {
   return (
-    <footer className="border-t border-[#1e1f2a] py-12 px-6 bg-[#0c0c10]">
+    <footer className="border-t border-white/[0.07] py-12 px-6 bg-[#08090B]">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Cpu size={14} className="text-primary" />
+              <div className="w-7 h-7 rounded-lg bg-[#7C3AED]/10 flex items-center justify-center">
+                <Cpu size={14} className="text-[#7C3AED]" />
               </div>
-              <span className="font-bold text-sm text-[#e8e8ec]">ACO</span>
+              <span className="font-bold text-sm text-[#F4F4F5]">ACO</span>
             </div>
-            <p className="text-[12px] text-gray-500 leading-relaxed">
+            <p className="text-[12px] text-[#71717A] leading-relaxed">
               Your Autonomous Computer Operator.
               <br />Think Less. Execute More.
             </p>
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Product</h4>
+            <h4 className="text-[11px] font-semibold text-[#71717A] uppercase tracking-wider mb-3">Product</h4>
             <div className="space-y-2">
-              <a href="#features" className="block text-[12px] text-gray-500 hover:text-[#e8e8ec] transition-colors">Features</a>
-              <a href="#architecture" className="block text-[12px] text-gray-500 hover:text-[#e8e8ec] transition-colors">Architecture</a>
-              <a href="#security" className="block text-[12px] text-gray-500 hover:text-[#e8e8ec] transition-colors">Security</a>
+              <a href="#features" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Features</a>
+              <a href="#architecture" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Architecture</a>
+              <a href="#security" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Security</a>
             </div>
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Getting Started</h4>
+            <h4 className="text-[11px] font-semibold text-[#71717A] uppercase tracking-wider mb-3">Getting Started</h4>
             <div className="space-y-2">
-              <a href="/login" className="block text-[12px] text-gray-500 hover:text-[#e8e8ec] transition-colors">Sign In</a>
-              <a href="#features" className="block text-[12px] text-gray-500 hover:text-[#e8e8ec] transition-colors">Features</a>
+              <a href="/login" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Sign In</a>
+              <a href="#features" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Features</a>
             </div>
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Legal</h4>
+            <h4 className="text-[11px] font-semibold text-[#71717A] uppercase tracking-wider mb-3">Legal</h4>
             <div className="space-y-2">
-              <span className="block text-[12px] text-gray-600">MIT License</span>
+              <span className="block text-[12px] text-[#71717A]/60">MIT License</span>
             </div>
           </div>
         </div>
 
-        <div className="border-t border-[#1e1f2a] pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-[11px] text-gray-600">
+        <div className="border-t border-white/[0.07] pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-[11px] text-[#71717A]/60">
             &copy; 2026 ACO. Built with FastAPI, LangGraph, Playwright, Next.js, MongoDB, and Tailwind.
           </p>
         </div>
@@ -677,7 +690,7 @@ function Footer() {
 /* ─── MAIN PAGE ─── */
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0c0c10] text-[#e8e8ec] overflow-x-hidden">
+    <div className="min-h-screen bg-[#08090B] text-[#F4F4F5] overflow-x-hidden">
       <Navbar />
       <Hero />
       <Features />

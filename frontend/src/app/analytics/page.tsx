@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 
 type TimeRange = '7d' | '30d' | '90d';
-const COLORS = ['#6366f1', '#4ade80', '#f87171', '#fbbf24', '#6b7280'];
+const COLORS = ['#7C3AED', '#4ADE80', '#F87171', '#FBBF24', '#71717A'];
 
 export default function AnalyticsPage() {
   const { data: executions, loading } = useExecutions();
@@ -89,19 +89,19 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
+    <div className="p-6 space-y-6 max-w-[1400px] mx-auto bg-[#08090B] min-h-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Analytics</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Execution performance and usage metrics</p>
+          <h1 className="text-xl font-bold text-[#F4F4F5]">Analytics</h1>
+          <p className="text-xs text-[#71717A] mt-0.5">Execution performance and usage metrics</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex bg-surface-2 border border-border rounded-md p-0.5">
+          <div className="flex bg-[#181B21] rounded-lg p-0.5">
             {(['7d', '30d', '90d'] as TimeRange[]).map(r => (
               <button key={r} onClick={() => setRange(r)}
                 className={cn('px-3 py-1 rounded-md text-[11px] font-medium transition cursor-pointer',
-                  range === r ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-foreground')}>
+                  range === r ? 'bg-[#7C3AED]/12 text-[#7C3AED]' : 'text-[#71717A] hover:text-[#F4F4F5]')}>
                 {r}
               </button>
             ))}
@@ -110,41 +110,42 @@ export default function AnalyticsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-gray-500" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-[#71717A]" /></div>
       ) : (
         <>
           {/* Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <StatCard label="Total Executions" value={stats.total} icon={<Activity size={16} />} color="text-primary" />
-            <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={16} />} color="text-accent" />
-            <StatCard label="Failed" value={stats.failed} icon={<XCircle size={16} />} color="text-danger" />
-            <StatCard label="Success Rate" value={`${stats.successRate}%`} icon={<TrendingUp size={16} />} color={stats.successRate > 80 ? 'text-accent' : 'text-yellow-400'} />
-            <StatCard label="Avg Duration" value={formatMs(stats.avgDuration)} icon={<Clock size={16} />} color="text-blue-400" />
+            <StatCard label="Total Executions" value={stats.total} icon={<Activity size={16} />} color="text-[#7C3AED]" />
+            <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={16} />} color="text-[#4ADE80]" />
+            <StatCard label="Failed" value={stats.failed} icon={<XCircle size={16} />} color="text-[#F87171]" />
+            <StatCard label="Success Rate" value={`${stats.successRate}%`} icon={<TrendingUp size={16} />} color={stats.successRate > 80 ? 'text-[#4ADE80]' : 'text-[#FBBF24]'} />
+            <StatCard label="Avg Duration" value={formatMs(stats.avgDuration)} icon={<Clock size={16} />} color="text-[#7C3AED]" />
           </div>
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Daily executions bar chart */}
-            <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4">Daily Executions</h3>
+            <div className="lg:col-span-2 rounded-[14px] border border-white/[0.07] bg-[#121419] p-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#71717A] mb-4">Daily Executions</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e1f2a" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#71717A' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#71717A' }} />
                   <Tooltip
-                    contentStyle={{ background: '#14151c', border: '1px solid #1e1f2a', borderRadius: '8px', fontSize: '11px' }}
-                    labelStyle={{ color: '#9ca3af' }}
+                    contentStyle={{ background: '#121419', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', fontSize: '11px', color: '#F4F4F5' }}
+                    labelStyle={{ color: '#A1A1AA' }}
+                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                   />
-                  <Bar dataKey="completed" fill="#4ade80" radius={[3, 3, 0, 0]} name="Completed" />
-                  <Bar dataKey="failed" fill="#f87171" radius={[3, 3, 0, 0]} name="Failed" />
+                  <Bar dataKey="completed" fill="#4ADE80" radius={[3, 3, 0, 0]} name="Completed" />
+                  <Bar dataKey="failed" fill="#F87171" radius={[3, 3, 0, 0]} name="Failed" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
             {/* Status pie chart */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4">Status Distribution</h3>
+            <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#71717A] mb-4">Status Distribution</h3>
               {statusData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
@@ -152,38 +153,39 @@ export default function AnalyticsPage() {
                       {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ background: '#14151c', border: '1px solid #1e1f2a', borderRadius: '8px', fontSize: '11px' }}
+                      contentStyle={{ background: '#121419', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', fontSize: '11px', color: '#F4F4F5' }}
                     />
                     <Legend
                       wrapperStyle={{ fontSize: '10px' }}
-                      formatter={(value: string) => <span style={{ color: '#9ca3af' }}>{value}</span>}
+                      formatter={(value: string) => <span style={{ color: '#A1A1AA' }}>{value}</span>}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-[250px] text-gray-500 text-xs">No data</div>
+                <div className="flex items-center justify-center h-[250px] text-[#71717A] text-xs">No data</div>
               )}
             </div>
           </div>
 
           {/* Hourly activity */}
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4">Hourly Activity</h3>
+          <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#71717A] mb-4">Hourly Activity</h3>
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={hourlyData}>
                 <defs>
                   <linearGradient id="colorExec" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#7C3AED" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e1f2a" />
-                <XAxis dataKey="hour" tick={{ fontSize: 9, fill: '#6b7280' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="hour" tick={{ fontSize: 9, fill: '#71717A' }} />
+                <YAxis tick={{ fontSize: 10, fill: '#71717A' }} />
                 <Tooltip
-                  contentStyle={{ background: '#14151c', border: '1px solid #1e1f2a', borderRadius: '8px', fontSize: '11px' }}
+                  contentStyle={{ background: '#121419', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', fontSize: '11px', color: '#F4F4F5' }}
+                  cursor={{ stroke: 'rgba(255,255,255,0.07)' }}
                 />
-                <Area type="monotone" dataKey="executions" stroke="#6366f1" fillOpacity={1} fill="url(#colorExec)" />
+                <Area type="monotone" dataKey="executions" stroke="#7C3AED" fillOpacity={1} fill="url(#colorExec)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -195,10 +197,10 @@ export default function AnalyticsPage() {
 
 function StatCard({ label, value, icon, color }: { label: string; value: any; icon: React.ReactNode; color: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-4">
       <div className={cn('mb-2', color)}>{icon}</div>
-      <p className="text-lg font-bold">{value}</p>
-      <p className="text-[10px] text-gray-500">{label}</p>
+      <p className="text-lg font-bold text-[#F4F4F5]">{value}</p>
+      <p className="text-[10px] text-[#71717A]">{label}</p>
     </div>
   );
 }

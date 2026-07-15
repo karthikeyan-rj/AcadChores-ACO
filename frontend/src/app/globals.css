@@ -5,22 +5,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --background: #0c0c10;
-  --foreground: #e8e8ec;
-  --surface: #101118;
-  --surface-2: #161720;
-  --surface-3: #1c1d28;
-  --card: #14151c;
-  --border: #1e1f2a;
-  --border-light: #272836;
-  --primary: #6366f1;
-  --primary-hover: #5558e6;
-  --accent: #4ade80;
-  --danger: #f87171;
-  --warning: #fbbf24;
-  --text-primary: #e8e8ec;
-  --text-secondary: #6b6d78;
-  --text-muted: #464856;
+  --bg: #08090B;
+  --bg-secondary: #0D0F12;
+  --surface: #121419;
+  --surface-2: #181B21;
+  --surface-3: #1E2128;
+  --card: #121419;
+  --border: rgba(255,255,255,0.07);
+  --border-light: rgba(255,255,255,0.12);
+  --primary: #7C3AED;
+  --primary-hover: #6D28D9;
+  --accent: #ADFF2F;
+  --success: #4ADE80;
+  --warning: #FBBF24;
+  --danger: #F87171;
+  --text-primary: #F4F4F5;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
 }
 
 * {
@@ -34,8 +35,8 @@ html, body {
 }
 
 body {
-  color: var(--foreground);
-  background-color: var(--background);
+  color: var(--text-primary);
+  background-color: var(--bg);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -45,29 +46,108 @@ html.app-page, html.app-page body {
   overflow: hidden;
 }
 
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #272836;
+  background: rgba(255,255,255,0.08);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #363848;
+  background: rgba(255,255,255,0.14);
 }
 
+/* Focus ring */
 *:focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.5);
+  outline: 1px solid rgba(124,58,237,0.6);
   outline-offset: 2px;
 }
 
+/* Selection */
 ::selection {
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(124,58,237,0.35);
   color: #fff;
+}
+
+/* Utility classes */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .glow-border-violet {
+    box-shadow: 0 0 0 1px rgba(124,58,237,0.3), 0 0 12px rgba(124,58,237,0.08);
+  }
+
+  .glow-border-accent {
+    box-shadow: 0 0 0 1px rgba(173,255,47,0.3), 0 0 12px rgba(173,255,47,0.06);
+  }
+
+  .noise-texture {
+    position: relative;
+  }
+  .noise-texture::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.015;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+  }
+
+  .organic-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.04;
+    pointer-events: none;
+  }
+
+  .composer-focus {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .composer-focus:focus-within {
+    border-color: rgba(124, 58, 237, 0.55) !important;
+    box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.25);
+  }
+
+  .search-shell {
+    border: 1px solid rgba(255,255,255,0.07);
+    background: #111318;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .search-shell:focus-within {
+    border-color: rgba(124,58,237,0.5);
+    box-shadow: 0 0 0 1px rgba(124,58,237,0.18), 0 6px 20px rgba(0,0,0,0.18);
+  }
+  .search-shell input {
+    outline: none;
+    box-shadow: none;
+  }
+}
+
+/* Textarea: remove native resize, outline, and inner shadows */
+textarea {
+  resize: none;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+textarea::-webkit-resizer {
+  display: none;
+}
+textarea:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .no-select {
@@ -79,12 +159,7 @@ html.app-page, html.app-page body {
   transition: all 0.15s ease;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

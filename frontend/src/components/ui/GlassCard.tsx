@@ -13,9 +13,9 @@ export function GlassCard({ children, className, hover = false, active = false, 
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-card',
-        hover && 'transition-all duration-200 hover:bg-card-hover hover:border-border-light cursor-pointer',
-        active && 'border-primary/40 bg-primary/5',
+        'rounded-[14px] border border-white/[0.07] bg-[#121419] shadow-matte shadow-inner-glow',
+        hover && 'transition-all duration-200 hover:bg-[#181B21] hover:border-white/[0.12] cursor-pointer',
+        active && 'border-[#7C3AED]/40 bg-[#7C3AED]/5',
         className
       )}
       {...props}

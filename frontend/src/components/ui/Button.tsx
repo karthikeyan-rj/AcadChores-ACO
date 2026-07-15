@@ -14,10 +14,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-primary hover:bg-primary-hover text-white shadow-sm',
-  secondary: 'bg-surface-2 hover:bg-surface-3 text-foreground border border-border hover:border-border-light',
-  ghost: 'bg-transparent hover:bg-surface-2 text-gray-400 hover:text-foreground',
-  danger: 'bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20',
+  primary: 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-matte',
+  secondary: 'bg-[#181B21] hover:bg-[#1E2128] text-[#F4F4F5] border border-white/[0.07] hover:border-white/[0.12]',
+  ghost: 'bg-transparent hover:bg-white/5 text-[#A1A1AA] hover:text-[#F4F4F5]',
+  danger: 'bg-[#F87171]/10 hover:bg-[#F87171]/15 text-[#F87171] border border-[#F87171]/20',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -30,7 +30,7 @@ export function Button({ variant = 'primary', size = 'md', loading, icon, classN
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 cursor-pointer',
+        'inline-flex items-center justify-center font-medium rounded-[10px] transition-all duration-150 cursor-pointer',
         'disabled:opacity-40 disabled:cursor-not-allowed',
         variantStyles[variant],
         sizeStyles[size],

@@ -1,14 +1,17 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 
+from app.core.database import db_manager
 from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.core.security import (
     verify_password, get_password_hash, create_access_token, create_refresh_token
 )
 from app.infrastructure.db.models import User
+from app.infrastructure.memory_db import memory_db
 from app.api.deps import get_current_user
 
 router = APIRouter()
@@ -32,6 +35,14 @@ class LoginRequest(BaseModel):
     password: str
 
 def _user_dict(user) -> dict:
+    if isinstance(user, dict):
+        return {
+            "id": str(user["_id"]),
+            "email": user.get("email", ""),
+            "name": user.get("name", ""),
+            "avatar_url": user.get("avatar_url"),
+            "role": user.get("role", "user"),
+        }
     return {
         "id": str(user.id),
         "email": user.email,
@@ -41,8 +52,9 @@ def _user_dict(user) -> dict:
     }
 
 def _token_response(user) -> dict:
-    access_token = create_access_token(data={"sub": user.email})
-    refresh_token = create_refresh_token(data={"sub": user.email})
+    email = user.get("email", "") if isinstance(user, dict) else user.email
+    access_token = create_access_token(data={"sub": email})
+    refresh_token = create_refresh_token(data={"sub": email})
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -53,6 +65,26 @@ def _token_response(user) -> dict:
 @router.post("/register", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_REGISTER)
 async def register(request: Request, req: RegisterRequest):
+    if db_manager.use_memory:
+        existing = await memory_db.find_one("users", {"email": req.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered.")
+
+        hashed_pw = get_password_hash(req.password)
+        user_doc = {
+            "email": req.email,
+            "name": req.name,
+            "hashed_password": hashed_pw,
+            "avatar_url": None,
+            "google_id": None,
+            "role": "user",
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        oid = await memory_db.insert("users", user_doc)
+        user_doc["_id"] = oid
+        return _token_response(user_doc)
+
     existing_user = await User.find_one(User.email == req.email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered.")
@@ -70,6 +102,14 @@ async def register(request: Request, req: RegisterRequest):
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(request: Request, req: LoginRequest):
+    if db_manager.use_memory:
+        user_doc = await memory_db.find_one("users", {"email": req.email})
+        if not user_doc:
+            raise HTTPException(status_code=401, detail="Incorrect email or password")
+        if not verify_password(req.password, user_doc.get("hashed_password", "")):
+            raise HTTPException(status_code=401, detail="Incorrect email or password")
+        return _token_response(user_doc)
+
     user = await User.find_one(User.email == req.email)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -82,6 +122,14 @@ async def login(request: Request, req: LoginRequest):
 @router.post("/login/form", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login_form(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    if db_manager.use_memory:
+        user_doc = await memory_db.find_one("users", {"email": form_data.username})
+        if not user_doc:
+            raise HTTPException(status_code=401, detail="Incorrect email or password")
+        if not verify_password(form_data.password, user_doc.get("hashed_password", "")):
+            raise HTTPException(status_code=401, detail="Incorrect email or password")
+        return _token_response(user_doc)
+
     user = await User.find_one(User.email == form_data.username)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -113,6 +161,30 @@ async def google_auth(request: Request, req: GoogleAuthRequest):
 
     if not google_email:
         raise HTTPException(status_code=401, detail="Google token missing email")
+
+    if db_manager.use_memory:
+        user_doc = await memory_db.find_one("users", {"email": google_email})
+        if not user_doc:
+            user_doc = {
+                "email": google_email,
+                "name": google_name,
+                "avatar_url": google_picture,
+                "google_id": google_sub,
+                "role": "user",
+                "hashed_password": None,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            oid = await memory_db.insert("users", user_doc)
+            user_doc["_id"] = oid
+        else:
+            user_doc["google_id"] = google_sub
+            if google_picture:
+                user_doc["avatar_url"] = google_picture
+            if google_name:
+                user_doc["name"] = google_name
+            await memory_db.update("users", {"_id": user_doc["_id"]}, user_doc)
+        return _token_response(user_doc)
 
     user = await User.find_one(User.email == google_email)
     if not user:

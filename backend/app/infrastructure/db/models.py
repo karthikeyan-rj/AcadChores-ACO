@@ -118,7 +118,7 @@ class IndexConfig(Document):
 
     class Settings:
         name = "index_configs"
-        indexes = ["user_id", ("user_id",)]
+        indexes = ["user_id"]
 
 class IndexJob(Document):
     user_id: PydanticObjectId
@@ -195,4 +195,4 @@ class UserSettings(Document):
 
     class Settings:
         name = "user_settings"
-        indexes = ["user_id", ("user_id",)]
+        indexes = ["user_id"]

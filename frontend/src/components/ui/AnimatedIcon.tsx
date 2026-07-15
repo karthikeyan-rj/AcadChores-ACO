@@ -23,17 +23,17 @@ export function AnimatedIcon({ name, status = 'idle', size = 16, className }: An
   const Icon = iconMap[name] || Cog;
 
   if (status === 'running') {
-    return <Loader2 size={size} className={cn('animate-spin text-primary', className)} />;
+    return <Loader2 size={size} className={cn('animate-spin text-[#ADFF2F]', className)} />;
   }
   if (status === 'completed') {
-    return <CheckCircle2 size={size} className={cn('text-accent', className)} />;
+    return <CheckCircle2 size={size} className={cn('text-[#4ADE80]', className)} />;
   }
   if (status === 'failed') {
-    return <XCircle size={size} className={cn('text-danger', className)} />;
+    return <XCircle size={size} className={cn('text-[#F87171]', className)} />;
   }
   if (status === 'warning') {
-    return <AlertTriangle size={size} className={cn('text-warning', className)} />;
+    return <AlertTriangle size={size} className={cn('text-[#FBBF24]', className)} />;
   }
 
-  return <Icon size={size} className={cn('text-gray-400', className)} />;
+  return <Icon size={size} className={cn('text-[#71717A]', className)} />;
 }

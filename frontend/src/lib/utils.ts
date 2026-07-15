@@ -28,34 +28,39 @@ export function formatRelativeTime(d: string): string {
 }
 
 export function statusColor(s: string): string {
-  const normalized = s.toLowerCase();
-  if (normalized === 'completed') return 'text-accent';
-  if (normalized === 'failed') return 'text-danger';
-  if (normalized === 'executing' || normalized === 'running') return 'text-primary';
-  if (normalized === 'waiting' || normalized === 'planning') return 'text-warning';
-  if (normalized === 'retry') return 'text-orange-400';
-  if (normalized === 'cancelled') return 'text-gray-500';
-  return 'text-gray-500';
+  const n = s.toLowerCase();
+  if (n === 'completed') return 'text-[#4ADE80]';
+  if (n === 'failed') return 'text-[#F87171]';
+  if (n === 'executing' || n === 'running') return 'text-[#ADFF2F]';
+  if (n === 'waiting' || n === 'planning') return 'text-[#7C3AED]';
+  if (n === 'awaiting' || n === 'approval') return 'text-[#FBBF24]';
+  if (n === 'retry') return 'text-[#FB923C]';
+  if (n === 'queued') return 'text-[#71717A]';
+  if (n === 'cancelled') return 'text-[#71717A]';
+  return 'text-[#71717A]';
 }
 
 export function statusBg(s: string): string {
-  const normalized = s.toLowerCase();
-  if (normalized === 'completed') return 'bg-accent/10 border-accent/20';
-  if (normalized === 'failed') return 'bg-danger/10 border-danger/20';
-  if (normalized === 'executing' || normalized === 'running') return 'bg-primary/10 border-primary/20';
-  if (normalized === 'waiting' || normalized === 'planning') return 'bg-warning/10 border-warning/20';
-  if (normalized === 'retry') return 'bg-orange-400/10 border-orange-400/20';
-  return 'bg-gray-500/10 border-gray-500/20';
+  const n = s.toLowerCase();
+  if (n === 'completed') return 'bg-[#4ADE80]/10 border-[#4ADE80]/20';
+  if (n === 'failed') return 'bg-[#F87171]/10 border-[#F87171]/20';
+  if (n === 'executing' || n === 'running') return 'bg-[#ADFF2F]/10 border-[#ADFF2F]/20';
+  if (n === 'waiting' || n === 'planning') return 'bg-[#7C3AED]/10 border-[#7C3AED]/20';
+  if (n === 'awaiting' || n === 'approval') return 'bg-[#FBBF24]/10 border-[#FBBF24]/20';
+  if (n === 'retry') return 'bg-[#FB923C]/10 border-[#FB923C]/20';
+  if (n === 'queued') return 'bg-white/5 border-white/5';
+  return 'bg-white/5 border-white/5';
 }
 
 export function statusDot(s: string): string {
-  const normalized = s.toLowerCase();
-  if (normalized === 'completed') return 'bg-accent';
-  if (normalized === 'failed') return 'bg-danger';
-  if (normalized === 'executing' || normalized === 'running') return 'bg-primary animate-pulse';
-  if (normalized === 'waiting' || normalized === 'planning') return 'bg-warning animate-pulse';
-  if (normalized === 'retry') return 'bg-orange-400 animate-pulse';
-  return 'bg-gray-500';
+  const n = s.toLowerCase();
+  if (n === 'completed') return 'bg-[#4ADE80]';
+  if (n === 'failed') return 'bg-[#F87171]';
+  if (n === 'executing' || n === 'running') return 'bg-[#ADFF2F] animate-pulse-slow';
+  if (n === 'waiting' || n === 'planning') return 'bg-[#7C3AED] animate-pulse-slow';
+  if (n === 'awaiting' || n === 'approval') return 'bg-[#FBBF24] animate-pulse-slow';
+  if (n === 'retry') return 'bg-[#FB923C] animate-pulse-slow';
+  return 'bg-white/20';
 }
 
 export function agentIcon(agentType: string): string {

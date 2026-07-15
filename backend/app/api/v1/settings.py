@@ -3,7 +3,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.database import db_manager
 from app.infrastructure.db.models import User, UserSettings
+from app.infrastructure.memory_db import memory_db
 from app.api.deps import get_current_user
 from app.services.credential_store import (
     save_api_key, get_api_key_hint, delete_api_key, list_api_keys,
@@ -78,8 +80,22 @@ class ApiKeyInfo(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _get_or_create(user_id: str) -> UserSettings:
-    """Return the user's settings document, creating defaults if absent."""
+async def _get_or_create(user_id: str):
+    """Return the user's settings, creating defaults if absent. Works in both memory and MongoDB modes."""
+    if db_manager.use_memory:
+        existing = await memory_db.find_one("user_settings", {"user_id": str(user_id)})
+        if existing:
+            return existing
+        defaults = {
+            "user_id": str(user_id),
+            "cloud_fallback_enabled": False,
+            "cloud_provider": "openai",
+            "cloud_model": "gpt-4o-mini",
+            "workflow_quality_threshold": 70,
+            "local_planner_retry_count": 1,
+        }
+        await memory_db.insert("user_settings", defaults)
+        return await memory_db.find_one("user_settings", {"user_id": str(user_id)})
     from beanie import PydanticObjectId
     oid = PydanticObjectId(user_id)
     existing = await UserSettings.find_one(UserSettings.user_id == oid)
@@ -90,15 +106,22 @@ async def _get_or_create(user_id: str) -> UserSettings:
     return doc
 
 
-def _to_response(settings: UserSettings, api_key_hint: Optional[str], api_key_configured: bool) -> dict:
+def _get_attr(obj, key, default=None):
+    """Get attribute from either an object or dict."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def _to_response(s, api_key_hint: Optional[str], api_key_configured: bool) -> dict:
     return SettingsResponse(
-        cloud_fallback_enabled=settings.cloud_fallback_enabled,
-        cloud_provider=settings.cloud_provider,
-        cloud_model=settings.cloud_model,
+        cloud_fallback_enabled=_get_attr(s, "cloud_fallback_enabled", False),
+        cloud_provider=_get_attr(s, "cloud_provider", "openai"),
+        cloud_model=_get_attr(s, "cloud_model", "gpt-4o-mini"),
         api_key_configured=api_key_configured,
         api_key_hint=api_key_hint,
-        workflow_quality_threshold=settings.workflow_quality_threshold,
-        local_planner_retry_count=settings.local_planner_retry_count,
+        workflow_quality_threshold=_get_attr(s, "workflow_quality_threshold", 70),
+        local_planner_retry_count=_get_attr(s, "local_planner_retry_count", 1),
     ).model_dump()
 
 
@@ -110,7 +133,8 @@ def _to_response(settings: UserSettings, api_key_hint: Optional[str], api_key_co
 async def get_settings(user: User = Depends(get_current_user)):
     user_id = str(user.id)
     s = await _get_or_create(user_id)
-    key_hint = await get_api_key_hint(user_id, s.cloud_provider)
+    provider = _get_attr(s, "cloud_provider", "openai")
+    key_hint = await get_api_key_hint(user_id, provider)
     return _to_response(s, api_key_hint=key_hint, api_key_configured=key_hint is not None)
 
 
@@ -123,13 +147,18 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    for field_name, value in update_data.items():
-        setattr(s, field_name, value)
+    if db_manager.use_memory:
+        for field_name, value in update_data.items():
+            s[field_name] = value
+        s["updated_at"] = datetime.utcnow().isoformat()
+        await memory_db.update("user_settings", {"user_id": user_id}, s)
+    else:
+        for field_name, value in update_data.items():
+            setattr(s, field_name, value)
+        s.updated_at = datetime.utcnow()
+        await s.save()
 
-    s.updated_at = datetime.utcnow()
-    await s.save()
-
-    key_hint = await get_api_key_hint(user_id, s.cloud_provider)
+    key_hint = await get_api_key_hint(user_id, _get_attr(s, "cloud_provider", "openai"))
     return _to_response(s, api_key_hint=key_hint, api_key_configured=key_hint is not None)
 
 

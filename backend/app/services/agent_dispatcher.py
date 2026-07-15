@@ -16,6 +16,7 @@ from app.core.security import permission_guard
 from app.services.desktop_service import desktop_service
 from app.services.vision_engine import vision_engine
 from app.services.indexer import file_indexer
+from app.services.process_manager import register_process, unregister_process
 from app.ai import llm_service
 
 logger = logging.getLogger(__name__)
@@ -1113,7 +1114,7 @@ class FileAgent(BaseAgent):
 
 
 class TerminalAgent(BaseAgent):
-    async def execute(self, action: str, params: Dict[str, Any], progress_cb: Callable[[int, str], Any]) -> Dict[str, Any]:
+    async def execute(self, action: str, params: Dict[str, Any], progress_cb: Callable[[int, str], Any], execution_id: str = "") -> Dict[str, Any]:
         await progress_cb(10, "Terminal shell action request.")
         
         authorized = await permission_guard.authorize_action("terminal", action, params)
@@ -1136,40 +1137,49 @@ class TerminalAgent(BaseAgent):
         loop = asyncio.get_running_loop()
         def run_proc():
             if sys.platform == "win32":
-                # Always use PowerShell — it handles both PowerShell and cmd commands
-                # Escape inner double quotes with backticks for PowerShell
                 escaped_cmd = command.replace('"', '`"')
                 ps_cmd = f'powershell.exe -NoProfile -Command "{escaped_cmd}"'
-                proc = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+                proc = subprocess.Popen(
+                    ps_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                )
             elif _needs_shell(command):
-                proc = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
+                proc = subprocess.Popen(
+                    command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                    preexec_fn=os.setsid,
+                )
             else:
                 try:
                     args = shlex.split(command, posix=False)
-                    # posix=False preserves quotes as literal chars — strip them
                     args = [a.strip('"').strip("'") for a in args]
                 except ValueError:
                     args = command
-                    proc = subprocess.run(
-                        command,
-                        shell=True,
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout
+                    proc = subprocess.Popen(
+                        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                        preexec_fn=os.setsid,
                     )
-                    return proc.returncode, proc.stdout, proc.stderr
-                proc = subprocess.run(
-                    args,
-                    shell=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout
-                )
-            return proc.returncode, proc.stdout, proc.stderr
+                    try:
+                        stdout, stderr = proc.communicate(timeout=timeout)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        stdout, stderr = proc.communicate()
+                        raise TimeoutError(f"Command timed out after {timeout}s")
+                    return proc.returncode, stdout, stderr
+
+            register_process(execution_id, proc)
+            try:
+                try:
+                    stdout, stderr = proc.communicate(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    stdout, stderr = proc.communicate()
+                    raise TimeoutError(f"Command timed out after {timeout}s")
+                return proc.returncode, stdout, stderr
+            finally:
+                unregister_process(execution_id)
 
         rc, stdout, stderr = await loop.run_in_executor(None, run_proc)
         
-        # Enforce output size limit
         stdout = _truncate_output(stdout or "")
         stderr = _truncate_output(stderr or "")
         output_preview = (stdout or stderr or "").strip()[:500]
@@ -1213,7 +1223,7 @@ class AgentManager:
         }
 
     async def execute_step(
-        self, step_data: Dict[str, Any], progress_cb: Callable[[int, str], Any], user_id: str = "default"
+        self, step_data: Dict[str, Any], progress_cb: Callable[[int, str], Any], user_id: str = "default", execution_id: str = ""
     ) -> Dict[str, Any]:
         """Looks up the target agent and runs the step actions."""
         agent_type = step_data.get("agent_type")
@@ -1229,6 +1239,8 @@ class AgentManager:
             return await agent.execute(action, params, progress_cb, user_id=user_id)
         if isinstance(agent, FileAgent):
             return await agent.execute(action, params, progress_cb, user_id=user_id)
+        if isinstance(agent, TerminalAgent):
+            return await agent.execute(action, params, progress_cb, execution_id=execution_id)
         return await agent.execute(action, params, progress_cb)
 
     async def cleanup(self):

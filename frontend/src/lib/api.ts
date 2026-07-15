@@ -59,6 +59,12 @@ export const api = {
   getExecutionLogs: (executionId: string, token: string) =>
     apiFetch(`/api/v1/executions/${executionId}/logs`, {}, token),
 
+  getExecution: (executionId: string, token: string) =>
+    apiFetch(`/api/v1/executions/${executionId}`, {}, token),
+
+  abortExecution: (executionId: string, token: string) =>
+    apiFetch(`/api/v1/executions/${executionId}/abort`, { method: 'POST' }, token),
+
   searchFiles: (query: string, token: string) =>
     apiFetch(`/api/v1/search/files?query=${encodeURIComponent(query)}`, {}, token),
 
@@ -78,6 +84,11 @@ export const api = {
 
   getIndexStats: (token: string) =>
     apiFetch('/api/v1/search/index/stats', {}, token),
+
+  deleteFile: (filePath: string, token: string) =>
+    apiFetch('/api/v1/search/files/delete', {
+      method: 'POST', body: JSON.stringify({ path: filePath }),
+    }, token),
 
   respondPermission: (requestId: string, approved: boolean, token: string) =>
     apiFetch('/api/v1/permissions/response', {

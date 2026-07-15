@@ -99,7 +99,7 @@ class TestPublicEndpoints:
     def test_health(self, client):
         resp = client.get("/health")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "healthy"
+        assert resp.json()["status"] in ("healthy", "degraded")
 
     def test_register_and_login(self, client):
         _register(client, "login@test.com", "Login")

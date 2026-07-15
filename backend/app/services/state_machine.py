@@ -79,6 +79,12 @@ class WorkflowStateMachine:
         return None
 
     @staticmethod
+    async def get_status(execution_id: str) -> Optional[str]:
+        """Returns the status string for an execution, or None if not found."""
+        state = await WorkflowStateMachine.get_state(execution_id)
+        return state.value if state else None
+
+    @staticmethod
     async def transition_to(
         execution_id: str,
         new_state: WorkflowState,

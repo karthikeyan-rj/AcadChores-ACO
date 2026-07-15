@@ -31,10 +31,10 @@ export function ExecutionHistory({ history, loading, activeExecutionId, onSelect
     <div className="space-y-1">
       {loading ? (
         <div className="flex items-center justify-center py-6">
-          <Loader2 size={16} className="text-gray-500 animate-spin" />
+          <Loader2 size={16} className="text-[#71717A] animate-spin" />
         </div>
       ) : history.length === 0 ? (
-        <p className="text-[10px] text-gray-600 text-center py-6">No execution history</p>
+        <p className="text-[10px] text-[#3F3F46] text-center py-6">No execution history</p>
       ) : (
         history.slice(0, 20).map((ex, i) => (
           <motion.button
@@ -44,10 +44,10 @@ export function ExecutionHistory({ history, loading, activeExecutionId, onSelect
             transition={{ delay: i * 0.02 }}
             onClick={() => onSelect(ex)}
             className={cn(
-              'w-full text-left p-2.5 rounded-lg border transition-all duration-150 cursor-pointer',
+              'w-full text-left p-2.5 rounded-[10px] border transition-all duration-150 cursor-pointer',
               activeExecutionId === ex._id
-                ? 'bg-primary/5 border-primary/30'
-                : 'bg-transparent border-transparent hover:bg-surface-2 hover:border-border'
+                ? 'bg-[#7C3AED]/5 border-[#7C3AED]/30'
+                : 'bg-transparent border-transparent hover:bg-[#181B21] hover:border-white/[0.07]'
             )}
           >
             <div className="flex items-center justify-between mb-1">
@@ -56,16 +56,16 @@ export function ExecutionHistory({ history, loading, activeExecutionId, onSelect
               </span>
               <div className="flex items-center gap-1.5">
                 {ex.completed_at && (
-                  <span className="text-[9px] text-accent font-mono">
+                  <span className="text-[9px] text-[#ADFF2F] font-mono">
                     {formatDuration(ex.started_at, ex.completed_at)}
                   </span>
                 )}
-                <span className="text-[9px] text-gray-600">
+                <span className="text-[9px] text-[#3F3F46]">
                   {formatRelativeTime(ex.started_at)}
                 </span>
               </div>
             </div>
-            <p className="text-[10px] text-gray-400 truncate">
+            <p className="text-[10px] text-[#A1A1AA] truncate">
               {ex.description || ex.title || `Execution ${ex._id.slice(-6)}`}
             </p>
           </motion.button>

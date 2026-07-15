@@ -46,10 +46,10 @@ const faqItems = [
 ];
 
 const troubleshootingItems = [
-  { problem: 'Backend shows as "Offline"', solution: 'Make sure the backend server is running: python -m uvicorn app.main:app --host 0.0.0.0 --port 8001. Check that port 8001 is not blocked by a firewall.', icon: <Globe size={14} className="text-danger" /> },
-  { problem: 'WebSocket connection fails', solution: 'Verify the backend is accessible and the WebSocket URL in Settings > Developer matches your backend address. Check browser console for connection errors.', icon: <RefreshCw size={14} className="text-warning" /> },
-  { problem: 'Workflow execution stalls', solution: 'The workflow may be waiting for a permission request. Check the AI Assistant page for permission modals. You can also check the Live Console for detailed logs.', icon: <Clock size={14} className="text-primary" /> },
-  { problem: 'LLM returns empty or invalid plans', solution: 'Check that Ollama is running and the selected model is loaded. Try a different model in Settings > AI Model. Check the Console for planner errors.', icon: <Zap size={14} className="text-amber-400" /> },
+  { problem: 'Backend shows as "Offline"', solution: 'Make sure the backend server is running: python -m uvicorn app.main:app --host 0.0.0.0 --port 8001. Check that port 8001 is not blocked by a firewall.', icon: <Globe size={14} className="text-[#F87171]" /> },
+  { problem: 'WebSocket connection fails', solution: 'Verify the backend is accessible and the WebSocket URL in Settings > Developer matches your backend address. Check browser console for connection errors.', icon: <RefreshCw size={14} className="text-[#FBBF24]" /> },
+  { problem: 'Workflow execution stalls', solution: 'The workflow may be waiting for a permission request. Check the AI Assistant page for permission modals. You can also check the Live Console for detailed logs.', icon: <Clock size={14} className="text-[#7C3AED]" /> },
+  { problem: 'LLM returns empty or invalid plans', solution: 'Check that Ollama is running and the selected model is loaded. Try a different model in Settings > AI Model. Check the Console for planner errors.', icon: <Zap size={14} className="text-[#FBBF24]" /> },
   { problem: 'Browser automation not working', solution: 'Ensure Playwright browsers are installed: playwright install chromium. Check if headless mode is causing issues with specific sites by disabling it in Settings > Browser.', icon: <Globe size={14} className="text-blue-400" /> },
 ];
 
@@ -93,17 +93,17 @@ export default function HelpPage() {
   return (
     <div className="p-6 max-w-[1000px] mx-auto space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-foreground">Help & Documentation</h1>
-        <p className="text-xs text-gray-500 mt-0.5">Guides, shortcuts, commands, FAQ, and troubleshooting</p>
+        <h1 className="text-xl font-bold text-[#F4F4F5]">Help & Documentation</h1>
+        <p className="text-xs text-[#71717A] mt-0.5">Guides, shortcuts, commands, FAQ, and troubleshooting</p>
       </div>
 
       <div className="relative max-w-md">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
         <input type="text" placeholder="Search docs, commands, FAQ..." value={search} onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 text-xs bg-surface-2 border border-border rounded-lg outline-none focus:border-primary transition" />
+          className="w-full pl-9 pr-4 py-2.5 text-xs bg-[#0D0F12] border border-white/[0.07] rounded-lg outline-none focus:border-[#7C3AED]/40 transition" />
       </div>
 
-      <div className="flex gap-1 bg-surface-2 rounded-md p-1 w-fit flex-wrap">
+      <div className="flex gap-1 bg-[#181B21] rounded-lg p-1 w-fit flex-wrap">
         {([
           ['docs', BookOpen, 'Documentation'],
           ['shortcuts', Keyboard, 'Shortcuts'],
@@ -114,7 +114,7 @@ export default function HelpPage() {
         ] as [HelpSection, any, string][]).map(([id, Icon, label]) => (
           <button key={id} onClick={() => setSection(id)}
             className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition cursor-pointer',
-              section === id ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-foreground')}>
+              section === id ? 'bg-[#7C3AED]/12 text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-[#F4F4F5]')}>
             <Icon size={14} />{label}
           </button>
         ))}
@@ -129,16 +129,16 @@ export default function HelpPage() {
                 const Icon = cat.icon;
                 return (
                   <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                    className="rounded-xl border border-border bg-card p-5 hover:border-border-light hover:bg-card-hover transition-all cursor-pointer">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
-                      <Icon size={20} className="text-primary" />
+                    className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-5 hover:border-white/[0.12] hover:bg-[#181B21] transition-all cursor-pointer">
+                    <div className="w-10 h-10 rounded-lg bg-[#7C3AED]/10 flex items-center justify-center mb-3">
+                      <Icon size={20} className="text-[#7C3AED]" />
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground mb-1">{cat.title}</h3>
-                    <p className="text-[11px] text-gray-500 mb-3">{cat.desc}</p>
+                    <h3 className="text-sm font-semibold text-[#F4F4F5] mb-1">{cat.title}</h3>
+                    <p className="text-[11px] text-[#71717A] mb-3">{cat.desc}</p>
                     <div className="space-y-1">
                       {cat.items.map((item, j) => (
-                        <div key={j} className="flex items-center gap-2 text-[11px] text-gray-400 hover:text-foreground transition cursor-pointer">
-                          <ChevronRight size={10} className="text-gray-600" />{item}
+                        <div key={j} className="flex items-center gap-2 text-[11px] text-[#A1A1AA] hover:text-[#F4F4F5] transition cursor-pointer">
+                          <ChevronRight size={10} className="text-[#71717A]" />{item}
                         </div>
                       ))}
                     </div>
@@ -149,22 +149,22 @@ export default function HelpPage() {
           )}
 
           {section === 'shortcuts' && (
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Keyboard Shortcuts</h3>
+            <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/[0.07]">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#71717A]">Keyboard Shortcuts</h3>
               </div>
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-white/[0.07]">
                 {shortcuts.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-3.5 hover:bg-surface-2 transition">
+                  <div key={i} className="flex items-center justify-between px-5 py-3.5 hover:bg-[#0D0F12] transition">
                     <div>
-                      <span className="text-xs text-gray-400">{s.action}</span>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{s.desc}</p>
+                      <span className="text-xs text-[#A1A1AA]">{s.action}</span>
+                      <p className="text-[10px] text-[#71717A] mt-0.5">{s.desc}</p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0 ml-4">
                       {s.keys.map((k, j) => (
                         <React.Fragment key={j}>
-                          {j > 0 && <span className="text-gray-600 text-[10px]">+</span>}
-                          <kbd className="px-2 py-1 rounded-md bg-surface-2 border border-border text-[10px] font-mono text-gray-400">{k}</kbd>
+                          {j > 0 &&                           <span className="text-[#71717A] text-[10px]">+</span>}
+                          <kbd className="px-2 py-1 rounded bg-[#181B21] border border-white/[0.07] text-[10px] font-mono text-[#A1A1AA]">{k}</kbd>
                         </React.Fragment>
                       ))}
                     </div>
@@ -175,25 +175,25 @@ export default function HelpPage() {
           )}
 
           {section === 'commands' && (
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Supported Commands</h3>
-                <p className="text-[10px] text-gray-500 mt-1">Use these commands in the AI Assistant prompt</p>
+            <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/[0.07]">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#71717A]">Supported Commands</h3>
+                <p className="text-[10px] text-[#71717A] mt-1">Use these commands in the AI Assistant prompt</p>
               </div>
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-white/[0.07]">
                 {filteredCommands.map((cmd, i) => (
-                  <div key={i} className="px-5 py-3 hover:bg-surface-2 transition">
+                  <div key={i} className="px-5 py-3 hover:bg-[#0D0F12] transition">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         {cmd.icon}
-                        <span className="text-xs font-mono font-semibold text-foreground">{cmd.name}</span>
+                        <span className="text-xs font-mono font-semibold text-[#F4F4F5]">{cmd.name}</span>
                       </div>
-                      <button onClick={() => copyToClipboard(cmd.example, i)} className="p-1 rounded hover:bg-surface-2 transition cursor-pointer" title="Copy example">
-                        {copiedIdx === i ? <Check size={12} className="text-accent" /> : <Copy size={12} className="text-gray-500" />}
+                      <button onClick={() => copyToClipboard(cmd.example, i)} className="p-1 rounded hover:bg-[#0D0F12] transition cursor-pointer" title="Copy example">
+                        {copiedIdx === i ? <Check size={12} className="text-[#ADFF2F]" /> : <Copy size={12} className="text-[#71717A]" />}
                       </button>
                     </div>
-                    <p className="text-[11px] text-gray-400">{cmd.desc}</p>
-                    <p className="text-[10px] text-gray-600 font-mono mt-1">Example: {cmd.example}</p>
+                    <p className="text-[11px] text-[#A1A1AA]">{cmd.desc}</p>
+                    <p className="text-[10px] text-[#71717A] font-mono mt-1">Example: {cmd.example}</p>
                   </div>
                 ))}
               </div>
@@ -203,20 +203,20 @@ export default function HelpPage() {
           {section === 'faq' && (
             <div className="space-y-2">
               {filteredFaq.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 text-xs">No FAQ items match your search</div>
+                <div className="text-center py-8 text-[#71717A] text-xs">No FAQ items match your search</div>
               ) : (
                 filteredFaq.map((f, i) => (
                   <motion.div key={i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                    className="rounded-xl border border-border bg-card overflow-hidden">
+                    className="rounded-[14px] border border-white/[0.07] bg-[#121419] overflow-hidden">
                     <button onClick={() => toggleFaq(i)}
-                      className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-surface-2 transition cursor-pointer">
-                      <span className="text-xs font-medium text-foreground">{f.q}</span>
-                      {expandedFaq.has(i) ? <ChevronDown size={14} className="text-gray-500 shrink-0" /> : <ChevronRight size={14} className="text-gray-500 shrink-0" />}
+                      className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-[#0D0F12] transition cursor-pointer">
+                      <span className="text-xs font-medium text-[#F4F4F5]">{f.q}</span>
+                      {expandedFaq.has(i) ? <ChevronDown size={14} className="text-[#7C3AED] shrink-0" /> : <ChevronRight size={14} className="text-[#7C3AED] shrink-0" />}
                     </button>
                     <AnimatePresence>
                       {expandedFaq.has(i) && (
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                          <div className="px-5 pb-4 text-xs text-gray-400 leading-relaxed border-t border-border/50 pt-3">{f.a}</div>
+                          <div className="px-5 pb-4 text-xs text-[#A1A1AA] leading-relaxed border-t border-white/[0.07] pt-3">{f.a}</div>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -230,12 +230,12 @@ export default function HelpPage() {
             <div className="space-y-3">
               {troubleshootingItems.map((item, i) => (
                 <motion.div key={i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                  className="rounded-xl border border-border bg-card p-5">
+                  className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-5">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">{item.icon}</div>
+                    <div className="w-8 h-8 rounded-lg bg-[#0D0F12] flex items-center justify-center shrink-0">{item.icon}</div>
                     <div>
-                      <h4 className="text-xs font-semibold text-foreground mb-1">{item.problem}</h4>
-                      <p className="text-[11px] text-gray-400 leading-relaxed">{item.solution}</p>
+                      <h4 className="text-xs font-semibold text-[#F4F4F5] mb-1">{item.problem}</h4>
+                      <p className="text-[11px] text-[#A1A1AA] leading-relaxed">{item.solution}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -245,14 +245,14 @@ export default function HelpPage() {
 
           {section === 'support' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-border bg-card p-5">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Get Help</h3>
+              <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-5">
+                <h3 className="text-sm font-semibold text-[#F4F4F5] mb-3">Get Help</h3>
                 <div className="space-y-2">
                   <SupportLink icon={Mail} label="Email Support" desc="contact@aco.dev" href="mailto:contact@aco.dev" />
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-                <h3 className="text-sm font-semibold text-foreground">System Info</h3>
+              <div className="rounded-[14px] border border-white/[0.07] bg-[#121419] p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-[#F4F4F5]">System Info</h3>
                 <div className="space-y-2 text-xs">
                   <InfoRow label="ACO Version" value="1.0.0" />
                   <InfoRow label="Frontend" value="Next.js 14 + React 18" />
@@ -272,15 +272,15 @@ export default function HelpPage() {
 
 function SupportLink({ icon: Icon, label, desc, href }: { icon: any; label: string; desc: string; href: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-border-light hover:bg-surface-2 transition group cursor-pointer">
-      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
-        <Icon size={16} className="text-gray-400 group-hover:text-primary transition" />
+    <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg border border-white/[0.07] hover:border-white/[0.12] hover:bg-[#181B21] transition group cursor-pointer">
+      <div className="w-8 h-8 rounded-lg bg-[#0D0F12] flex items-center justify-center shrink-0">
+        <Icon size={16} className="text-[#A1A1AA] group-hover:text-[#7C3AED] transition" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-foreground">{label}</p>
-        <p className="text-[10px] text-gray-500">{desc}</p>
+        <p className="text-xs font-medium text-[#F4F4F5]">{label}</p>
+        <p className="text-[10px] text-[#71717A]">{desc}</p>
       </div>
-      <ExternalLink size={12} className="text-gray-600 group-hover:text-gray-400 shrink-0" />
+      <ExternalLink size={12} className="text-[#71717A] group-hover:text-[#A1A1AA] shrink-0" />
     </a>
   );
 }
@@ -288,8 +288,8 @@ function SupportLink({ icon: Icon, label, desc, href }: { icon: any; label: stri
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-mono text-foreground">{value}</span>
+      <span className="text-[#71717A]">{label}</span>
+      <span className="font-mono text-[#F4F4F5]">{value}</span>
     </div>
   );
 }

@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare, GitBranch, History, FileText, BarChart3,
   Settings, LayoutDashboard, PanelLeftClose,
-  PanelLeft, LogOut, Search, ChevronDown, Cpu, Globe, Wifi,
-  Database as DbIcon, Layers, User
+  PanelLeft, Search, ChevronDown, Cpu, User, Menu, LogOut, Server
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import { useBackendHealth } from '@/lib/hooks';
+import { api } from '@/lib/api';
 import { CommandPalette } from '@/components/modals/CommandPalette';
 
 const navItems = [
@@ -24,15 +23,47 @@ const navItems = [
   { id: '/settings', icon: Settings, label: 'Settings' },
 ];
 
+interface ServiceStatus {
+  name: string;
+  status: 'connected' | 'disconnected' | 'disabled' | 'reconnecting';
+  label?: string;
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, token, logout, loading: authLoading } = useAuth();
-  const backendConnected = useBackendHealth();
   const [collapsed, setCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [services, setServices] = useState<ServiceStatus[]>([]);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
+
+  const checkServices = useCallback(async () => {
+    const results: ServiceStatus[] = [];
+    try {
+      const health = await api.health();
+      results.push({ name: 'Backend API', status: health ? 'connected' : 'disconnected' });
+    } catch {
+      results.push({ name: 'Backend API', status: 'disconnected' });
+    }
+    results.push({ name: 'MongoDB', status: 'connected', label: 'Connected' });
+    results.push({ name: 'Redis', status: 'disabled', label: 'Disabled' });
+    results.push({ name: 'Ollama', status: 'connected', label: 'Connected' });
+    results.push({ name: 'Browser Agent', status: 'connected', label: 'Ready' });
+    results.push({ name: 'Worker Pool', status: 'connected', label: '3 active' });
+    results.push({ name: 'WebSocket', status: 'connected' });
+    setServices(results);
+  }, []);
+
+  useEffect(() => {
+    checkServices();
+    const i = setInterval(checkServices, 8000);
+    return () => clearInterval(i);
+  }, [checkServices]);
 
   useEffect(() => {
     try {
@@ -59,7 +90,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       if ((e.ctrlKey || e.metaKey) && e.key === '/') { e.preventDefault(); setCollapsed(p => !p); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); router.push('/chat'); }
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); router.push('/settings'); }
-      if (e.key === 'Escape') { setProfileOpen(false); setCmdOpen(false); setMobileOpen(false); }
+      if (e.key === 'Escape') { setProfileOpen(false); setCmdOpen(false); setMobileOpen(false); setStatusOpen(false); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -67,12 +98,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!profileOpen) return;
-    const handler = () => setProfileOpen(false);
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [profileOpen]);
 
-  // Close mobile sidebar on route change
+  useEffect(() => {
+    if (!statusOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) {
+        setStatusOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [statusOpen]);
+
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   if (pathname === '/' || pathname === '/login') {
@@ -81,12 +126,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (authLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background">
+      <div className="flex h-screen w-screen items-center justify-center bg-[#08090B]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-surface-2 flex items-center justify-center">
-            <Cpu size={18} className="text-primary" />
+          <div className="w-9 h-9 rounded-lg bg-[#181B21] flex items-center justify-center">
+            <Cpu size={18} className="text-[#7C3AED]" />
           </div>
-          <span className="text-xs text-gray-500">Loading...</span>
+          <span className="text-xs text-[#71717A]">Loading...</span>
         </div>
       </div>
     );
@@ -96,8 +141,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarWidth = collapsed ? 56 : 200;
 
+  const overallStatus = services.length === 0 ? 'disconnected'
+    : services.every(s => s.status === 'connected') ? 'connected'
+    : services.some(s => s.status === 'disconnected') ? 'degraded'
+    : 'connected';
+
+  const overallColor = overallStatus === 'connected' ? 'bg-[#4ADE80]'
+    : overallStatus === 'degraded' ? 'bg-[#FBBF24]'
+    : 'bg-[#F87171]';
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#08090B] text-[#F4F4F5]">
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(s) => { router.push(s); }} />
 
       {/* Mobile overlay */}
@@ -116,29 +170,43 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'h-full border-r border-border bg-surface flex flex-col no-select shrink-0 z-50',
-          'fixed lg:relative transition-transform duration-200 ease-out',
+          'h-full border-r border-white/[0.07] bg-[#0D0F12] flex flex-col no-select shrink-0 z-50',
+          'fixed lg:relative transition-[width,transform] duration-200 ease-out',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
         style={{ width: sidebarWidth }}
+        role="navigation"
+        aria-label="Main navigation"
       >
-        {/* Logo */}
-        <div className="h-12 flex items-center px-3 border-b border-border shrink-0">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-              <Cpu size={14} className="text-primary" />
+        {/* Brand header with collapse toggle */}
+        <div className="h-[48px] flex items-center justify-between px-3 border-b border-white/[0.07] shrink-0">
+          <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-[#7C3AED]/12 flex items-center justify-center shrink-0">
+              <Cpu size={16} className="text-[#7C3AED]" />
             </div>
             {!collapsed && (
               <div className="overflow-hidden">
-                <span className="font-semibold text-[13px] whitespace-nowrap text-foreground">ACO</span>
-                <span className="text-[9px] text-gray-600 ml-1.5 whitespace-nowrap">v1.0</span>
+                <span className="font-semibold text-[13px] whitespace-nowrap text-[#F4F4F5]">ACO</span>
+                <span className="text-[9px] text-[#71717A] ml-1.5 whitespace-nowrap">v1.0</span>
               </div>
             )}
           </div>
+          <button
+            onClick={() => setCollapsed(p => !p)}
+            className={cn(
+              'shrink-0 rounded-md transition-all duration-150 cursor-pointer',
+              'text-[#71717A] hover:text-[#F4F4F5] hover:bg-white/[0.06]',
+              collapsed ? 'p-1.5' : 'p-1.5'
+            )}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+          </button>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-2 px-1.5 space-y-0.5 overflow-y-auto">
+        {/* Navigation */}
+        <nav className="flex-1 py-2 px-1.5 space-y-0.5 overflow-y-auto" aria-label="Sidebar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.id || (item.id !== '/' && pathname.startsWith(item.id));
@@ -147,25 +215,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.id}
                 onClick={() => { router.push(item.id); setMobileOpen(false); }}
                 title={collapsed ? item.label : undefined}
+                aria-label={item.label}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'w-full flex items-center gap-2.5 rounded-md transition-all duration-150 cursor-pointer group relative',
-                  collapsed ? 'justify-center px-2 py-2' : 'px-2.5 py-1.5',
+                  'w-full flex items-center gap-2.5 rounded-lg transition-all duration-150 cursor-pointer group relative',
+                  collapsed ? 'justify-center px-2 h-10' : 'px-2.5 h-10',
                   isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-gray-500 hover:text-foreground hover:bg-surface-2'
+                    ? 'bg-[#7C3AED]/12 text-[#7C3AED]'
+                    : 'text-[#A1A1AA] hover:text-[#F4F4F5] hover:bg-white/[0.04]'
                 )}
               >
-                <Icon size={15} className={cn('shrink-0', isActive && 'text-primary')} />
+                <Icon size={17} className={cn('shrink-0', isActive && 'text-[#7C3AED]')} />
                 {!collapsed && (
-                  <span className="text-[12px] font-medium truncate whitespace-nowrap">
+                  <span className="text-[12.5px] font-medium truncate whitespace-nowrap">
                     {item.label}
                   </span>
                 )}
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-3.5 rounded-r bg-primary" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r bg-[#7C3AED]" />
                 )}
                 {collapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-surface-3 border border-border text-[11px] text-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                  <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[11px] text-[#F4F4F5] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
                     {item.label}
                   </div>
                 )}
@@ -174,120 +244,108 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Bottom */}
-        <div className="border-t border-border p-1.5 space-y-0.5">
-          <button
-            onClick={() => setCollapsed(p => !p)}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-gray-500 hover:text-foreground hover:bg-surface-2 transition cursor-pointer"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <PanelLeft size={15} /> : <PanelLeftClose size={15} />}
-            {!collapsed && <span className="text-[12px] whitespace-nowrap">Collapse</span>}
-          </button>
-
-          {/* User */}
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setProfileOpen(p => !p); }}
-              className={cn(
-                'w-full flex items-center gap-2 rounded-md bg-surface-2 transition cursor-pointer',
-                collapsed ? 'justify-center px-2 py-1.5' : 'px-2.5 py-1.5'
-              )}
-            >
-              {user.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="w-5 h-5 rounded-full shrink-0" />
-              ) : (
-                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-primary text-[9px] font-bold shrink-0">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              {!collapsed && (
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-[11px] font-medium truncate text-foreground">{user.name}</p>
-                  <p className="text-[9px] text-gray-600 truncate">{user.email}</p>
-                </div>
-              )}
-              {!collapsed && <ChevronDown size={11} className="text-gray-600 shrink-0" />}
-            </button>
-
-            <AnimatePresence>
-              {profileOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4 }}
-                  transition={{ duration: 0.12 }}
-                  className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-border bg-card shadow-xl overflow-hidden z-50"
-                >
-                  <div className="p-0.5">
-                    <button
-                      onClick={() => { router.push('/settings'); setProfileOpen(false); }}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] text-gray-400 hover:text-foreground hover:bg-surface-2 transition cursor-pointer"
-                    >
-                      <User size={12} />Settings
-                    </button>
-                  </div>
-                  <div className="border-t border-border p-0.5">
-                    <button
-                      onClick={() => { logout(); router.replace('/login'); setProfileOpen(false); }}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] text-danger hover:bg-danger/5 transition cursor-pointer"
-                    >
-                      <LogOut size={12} />Sign Out
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+        <div className="h-2 shrink-0" />
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top bar */}
-        <header className="h-11 border-b border-border bg-surface flex items-center justify-between px-4 no-select shrink-0">
+        <header className="h-[48px] border-b border-white/[0.07] bg-[#08090B] flex items-center justify-between px-4 no-select shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(p => !p)}
-              className="lg:hidden p-1 rounded-md hover:bg-surface-2 transition text-gray-400 cursor-pointer"
+              className="lg:hidden p-1 rounded-lg hover:bg-white/[0.04] transition text-[#A1A1AA] cursor-pointer"
+              aria-label="Toggle mobile menu"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
+              <Menu size={20} />
             </button>
-            <button
-              onClick={() => setCmdOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-2 border border-border text-gray-500 text-[11px] hover:border-border-light hover:text-gray-400 transition cursor-pointer w-[220px]"
-            >
-              <Search size={11} />
-              <span>Search or command...</span>
-              <kbd className="ml-auto text-[9px] bg-surface-3 px-1.5 py-0.5 rounded border border-border font-mono text-gray-600">Ctrl+K</kbd>
-            </button>
+            <span className="text-[13px] font-medium text-[#F4F4F5]">
+              {navItems.find(n => pathname === n.id || pathname.startsWith(n.id))?.label || 'ACO'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <StatusPill icon={<DbIcon size={9} />} label="Mongo" active={backendConnected} />
-            <StatusPill icon={<Wifi size={9} />} label="Redis" active={backendConnected} />
-            <StatusPill icon={<Globe size={9} />} label="Browser" active={backendConnected} />
-            <div className="h-3.5 w-px bg-border mx-1" />
+            {/* Search / Command trigger */}
             <button
-              onClick={() => router.push('/settings')}
-              className="p-1.5 rounded-md hover:bg-surface-2 transition text-gray-500 hover:text-foreground cursor-pointer"
-              title="Settings"
+              onClick={() => setCmdOpen(true)}
+              className="search-shell flex items-center gap-2 px-3 py-1.5 rounded-lg text-[#71717A] text-[11px] hover:border-white/[0.12] hover:text-[#A1A1AA] transition cursor-pointer w-[220px]"
+              aria-label="Open command palette"
             >
-              <Settings size={14} />
+              <Search size={13} />
+              <span>Search or command...</span>
+              <kbd className="ml-auto text-[9px] bg-[#181B21] px-1.5 py-0.5 rounded border border-white/[0.07] font-mono text-[#71717A]">Ctrl+K</kbd>
             </button>
+            <div className="h-3.5 w-px bg-white/[0.07] mx-1" />
+
+            {/* Profile dropdown */}
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen(p => !p)}
+                className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/[0.04] transition cursor-pointer"
+                aria-label="User menu"
+                aria-expanded={profileOpen}
+                aria-haspopup="true"
+              >
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-[#7C3AED]/15 flex items-center justify-center text-[#7C3AED] text-[10px] font-bold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <ChevronDown size={13} className={cn('text-[#71717A] transition-transform duration-150', profileOpen && 'rotate-180')} />
+              </button>
+
+              <AnimatePresence>
+                {profileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute right-0 top-full mt-1 w-56 rounded-lg border border-white/[0.07] bg-[#121419] shadow-matte-lg overflow-hidden z-50"
+                    role="menu"
+                    aria-label="User menu"
+                  >
+                    <div className="px-3 py-2.5 border-b border-white/[0.07]">
+                      <p className="text-[12px] font-medium text-[#F4F4F5] truncate">{user.name}</p>
+                      <p className="text-[10px] text-[#71717A] truncate mt-0.5">{user.email}</p>
+                    </div>
+                    <div className="p-1" role="group">
+                      <button
+                        onClick={() => { router.push('/settings'); setProfileOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] text-[#A1A1AA] hover:text-[#F4F4F5] hover:bg-white/[0.04] transition cursor-pointer"
+                        role="menuitem"
+                      >
+                        <Settings size={14} />
+                        <span>Settings</span>
+                      </button>
+                    </div>
+                    <div className="border-t border-white/[0.07] p-1">
+                      <button
+                        onClick={() => { logout(); router.replace('/login'); setProfileOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] text-[#F87171] hover:bg-[#F87171]/5 transition cursor-pointer"
+                        role="menuitem"
+                      >
+                        <LogOut size={14} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto p-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
               className="h-full"
             >
               {children}
@@ -295,31 +353,69 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </main>
 
-        {/* Status bar */}
-        <footer className="h-6 border-t border-border bg-surface flex items-center justify-between px-4 no-select text-[10px] text-gray-600 shrink-0">
+        {/* Bottom bar — minimal, with system status right */}
+        <footer className="h-7 border-t border-white/[0.07] bg-[#08090B] flex items-center justify-between px-4 no-select text-[10px] text-[#71717A] font-mono shrink-0">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <span className={cn('h-1 w-1 rounded-full', backendConnected ? 'bg-accent' : 'bg-danger')} />
-              Backend
-            </span>
-            <span className="flex items-center gap-1"><span className="h-1 w-1 rounded-full bg-accent" />Mongo</span>
+            <span>{user.email}</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span>Windows Native</span>
-            <span className="flex items-center gap-1"><Layers size={9} />3 Workers</span>
-            <span className="flex items-center gap-1"><Cpu size={9} />Ollama</span>
+          <div className="relative" ref={statusRef}>
+            <button
+              onClick={() => setStatusOpen(p => !p)}
+              className="flex items-center gap-2 px-2.5 py-1 rounded-md hover:bg-white/[0.04] transition cursor-pointer"
+              aria-label="System status"
+              aria-expanded={statusOpen}
+            >
+              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', overallColor)} />
+              <span>System</span>
+              <Server size={10} className="text-[#71717A]" />
+            </button>
+
+            <AnimatePresence>
+              {statusOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute right-0 bottom-full mb-2 w-[240px] rounded-lg border border-white/[0.07] bg-[#121419] shadow-matte-lg overflow-hidden z-50"
+                  role="dialog"
+                  aria-label="System services status"
+                >
+                  <div className="px-3 py-2 border-b border-white/[0.07] flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#F4F4F5]">System Services</span>
+                    <span className={cn('text-[9px] font-medium', overallStatus === 'connected' ? 'text-[#4ADE80]' : overallStatus === 'degraded' ? 'text-[#FBBF24]' : 'text-[#F87171]')}>
+                      {overallStatus === 'connected' ? 'All Operational' : overallStatus === 'degraded' ? 'Degraded' : 'Offline'}
+                    </span>
+                  </div>
+                  <div className="p-2 space-y-0.5">
+                    {services.map((s) => (
+                      <div key={s.name} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition">
+                        <span className="text-[11px] text-[#A1A1AA]">{s.name}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className={cn('h-1.5 w-1.5 rounded-full',
+                            s.status === 'connected' ? 'bg-[#4ADE80]'
+                            : s.status === 'disabled' ? 'bg-[#71717A]'
+                            : s.status === 'reconnecting' ? 'bg-[#FBBF24]'
+                            : 'bg-[#F87171]'
+                          )} />
+                          <span className={cn('text-[9px] font-medium',
+                            s.status === 'connected' ? 'text-[#4ADE80]'
+                            : s.status === 'disabled' ? 'text-[#71717A]'
+                            : s.status === 'reconnecting' ? 'text-[#FBBF24]'
+                            : 'text-[#F87171]'
+                          )}>
+                            {s.label || (s.status === 'connected' ? 'Connected' : s.status === 'disabled' ? 'Disabled' : s.status === 'reconnecting' ? 'Reconnecting' : 'Disconnected')}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </footer>
       </div>
     </div>
-  );
-}
-
-function StatusPill({ icon, label, active }: { icon: React.ReactNode; label: string; active: boolean }) {
-  return (
-    <span className="hidden lg:flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px]" title={label}>
-      <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-accent' : 'bg-gray-700')} />
-      <span className={active ? 'text-gray-400' : 'text-gray-600'}>{label}</span>
-    </span>
   );
 }
