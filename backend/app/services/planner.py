@@ -365,13 +365,7 @@ class PlannerService:
                     logger.warning(f"LLM planner errors (attempt {attempt+1}): {final_state['errors']}")
 
                 llm_steps = final_state.get("steps", [])
-                for idx, step in enumerate(llm_steps):
-                    if "parameters" not in step and "params" in step:
-                        step["parameters"] = step.pop("params")
-                    if "step_id" not in step:
-                        step["step_id"] = f"step_{idx + 1}"
-                    if "name" not in step:
-                        step["name"] = step.get("action", "unknown")
+                llm_steps = self._sanitize_steps(llm_steps)
             except Exception as e:
                 logger.warning(f"LLM planner failed (attempt {attempt+1}): {e}")
 
@@ -484,15 +478,79 @@ class PlannerService:
 
             if "pending_confirmation" not in result:
                 for s in best_steps:
-                    if s.get("agent_type") == "file" and s.get("action") in ("write", "create"):
-                        file_path = s.get("parameters", {}).get("path", s.get("parameters", {}).get("filename", "unknown"))
-                        result["pending_confirmation"] = {
-                            "type": "file_write",
-                            "path": file_path,
-                            "message": f"ACO wants to create file at {file_path}. Allow?",
-                        }
-                        logger.info(f"File write detected — forcing confirmation: {file_path}")
-                        break
+                    if s.get("agent_type") == "file":
+                        action = s.get("action", "")
+                        params = s.get("parameters", {})
+                        if action in ("write", "create"):
+                            file_path = params.get("path", params.get("filename", "unknown"))
+                            result["pending_confirmation"] = {
+                                "type": "file_write", "path": file_path,
+                                "message": f"ACO wants to create file at {file_path}. Allow?",
+                            }
+                            logger.info(f"File write detected — forcing confirmation: {file_path}")
+                            break
+                        if action == "delete":
+                            file_path = params.get("path", "unknown")
+                            file_size = None
+                            file_mtime = None
+                            filename = os.path.basename(file_path) if file_path != "unknown" else "unknown"
+                            try:
+                                if os.path.exists(file_path):
+                                    file_size = os.path.getsize(file_path)
+                                    import time
+                                    file_mtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(file_path)))
+                            except OSError:
+                                pass
+                            result["pending_confirmation"] = {
+                                "type": "file_delete",
+                                "path": file_path,
+                                "filename": filename,
+                                "file_size": file_size,
+                                "file_mtime": file_mtime,
+                                "message": f"ACO wants to delete '{filename}'. Allow?",
+                            }
+                            logger.info(f"File delete detected — forcing confirmation: {file_path}")
+                            break
+                    if s.get("agent_type") == "terminal":
+                        cmd = s.get("parameters", {}).get("command", "").lower()
+                        delete_cmd_patterns = ["remove-item", "del ", "del/", "rm ", "rm -", "rmdir", "erase "]
+                        if any(p in cmd for p in delete_cmd_patterns):
+                            result["pending_confirmation"] = {
+                                "type": "terminal_command",
+                                "command": s.get("parameters", {}).get("command", ""),
+                                "message": f"ACO wants to run a delete command. Allow?\n\nCommand: {s.get('parameters', {}).get('command', '')}",
+                                "source": "terminal_delete_detection",
+                            }
+                            logger.info(f"Terminal delete command detected — forcing confirmation: {cmd[:80]}")
+                            break
+                        if action == "move":
+                            src = params.get("source", "?")
+                            dst = params.get("destination", "?")
+                            result["pending_confirmation"] = {
+                                "type": "file_move", "source": src, "destination": dst,
+                                "message": f"ACO wants to move '{src}' to '{dst}'. Allow?",
+                            }
+                            logger.info(f"File move detected — forcing confirmation: {src} → {dst}")
+                            break
+                        if action == "rename":
+                            file_path = params.get("path", "?")
+                            new_name = params.get("new_name", "?")
+                            result["pending_confirmation"] = {
+                                "type": "file_rename", "path": file_path, "new_name": new_name,
+                                "message": f"ACO wants to rename '{os.path.basename(file_path)}' to '{new_name}'. Allow?",
+                            }
+                            logger.info(f"File rename detected — forcing confirmation: {file_path} → {new_name}")
+                            break
+                        if action == "move_matching":
+                            src_dir = params.get("source_directory", "?")
+                            dst_dir = params.get("destination_directory", "?")
+                            keyword = params.get("keyword", "?")
+                            result["pending_confirmation"] = {
+                                "type": "file_move_matching", "source": src_dir, "destination": dst_dir, "keyword": keyword,
+                                "message": f"ACO wants to move files matching '{keyword}' from '{src_dir}' to '{dst_dir}'. Allow?",
+                            }
+                            logger.info(f"File move_matching detected — forcing confirmation: {keyword}")
+                            break
 
             return result
 
@@ -549,6 +607,8 @@ class PlannerService:
         metadata["cloud_attempts"] = 1
         if cloud_result.success and cloud_result.workflow:
             cloud_steps = cloud_result.workflow.get("steps", [])
+            if cloud_steps:
+                cloud_steps = self._sanitize_steps(cloud_steps)
             if cloud_steps:
                 from app.services.workflow_validator import WorkflowValidator
                 wf_validator = WorkflowValidator(min_quality_score=min_quality)
@@ -640,6 +700,11 @@ class PlannerService:
             '{"step_id":"step_3","name":"Submit","agent_type":"browser","action":"press","parameters":{"key":"Enter"}},'
             '{"step_id":"step_4","name":"Extract results","agent_type":"browser","action":"scrape_text","parameters":{}}]\n'
             "\n"
+            "CRITICAL: File deletion MUST use the File Agent (agent_type: \"file\", action: \"delete\"). "
+            "NEVER use terminal commands (Remove-Item, del, rm, rmdir, erase) for normal file deletion. "
+            "The File Agent handles path resolution, permission checks, and verification automatically.\n"
+            "Terminal deletion is ONLY allowed when the user explicitly requests a specific terminal command.\n"
+            "\n"
             "OUTPUT: ONLY a JSON array. No markdown. No text. Just the array.\n"
         )
 
@@ -727,6 +792,148 @@ class PlannerService:
 
         is_valid = len(errors) == 0
         return {"errors": state.errors + errors, "is_valid": is_valid}
+
+    # Agent type aliases: LLM may produce variant names that the dispatcher won't recognize
+    _AGENT_TYPE_FIXES: Dict[str, str] = {
+        "filesystem": "file",
+        "file_system": "file",
+        "file_system_agent": "file",
+        "browser_agent": "browser",
+        "computer_agent": "computer",
+        "desktop_agent": "desktop",
+        "terminal_agent": "terminal",
+        "application_agent": "application",
+        "messaging_agent": "messaging",
+        "email_agent": "email",
+        "calendar_agent": "calendar",
+        "media_agent": "media",
+        "ai_assistant_agent": "ai_assistant",
+        "vision_agent": "vision",
+    }
+
+    # Vague actions that a planner should never return
+    _VAGUE_ACTIONS = {"do_something", "handle", "process", "execute", "perform", "run_task", "task", "action", "step", "do", "make", "setup"}
+
+    # Terminal delete commands that should use file.delete instead
+    _TERMINAL_DELETE_PATTERNS = {
+        "remove-item", "del ", "del/", "rm ", "rm -", "rmdir", "erase ",
+        "remove item", "del /", "rd /", "rd ", "unlink",
+    }
+
+    def _is_terminal_delete_command(self, action: str, params: Dict[str, Any]) -> bool:
+        """Check if a terminal step is attempting file deletion."""
+        if action != "run":
+            return False
+        cmd = params.get("command", "").lower().strip()
+        if not cmd:
+            return False
+        # Check if it's a known delete command pattern
+        for pattern in self._TERMINAL_DELETE_PATTERNS:
+            if pattern in cmd:
+                return True
+        return False
+
+    def _sanitize_steps(self, steps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Post-process LLM output to fix common mistakes and strip invalid steps.
+
+        1. Normalize agent_type aliases (e.g. 'filesystem' -> 'file')
+        2. Fill missing step_id / name fields
+        3. Remove vague/unrecognizable actions
+        4. Filter out steps with no valid agent_type after normalization
+        5. Convert terminal delete commands to file.delete steps
+        6. Reject duplicate steps
+        """
+        from app.services.workflow_validator import AGENT_TYPES, AGENT_ACTIONS, VAGUE_ACTIONS
+
+        sanitized: List[Dict[str, Any]] = []
+        seen_keys = set()
+        for idx, step in enumerate(steps):
+            if not isinstance(step, dict):
+                continue
+
+            # Normalize agent_type
+            agent = step.get("agent_type", "").lower().strip()
+            agent = self._AGENT_TYPE_FIXES.get(agent, agent)
+            step["agent_type"] = agent
+
+            # Normalize action
+            action = step.get("action", "").lower().strip()
+            step["action"] = action
+
+            # Check for terminal delete commands that should be file.delete
+            params = step.get("parameters", {}) or step.get("params", {})
+            if self._is_terminal_delete_command(action, params):
+                logger.warning(f"Sanitizer: converting terminal delete command to file.delete (step_id={step.get('step_id')})")
+                # Extract the file path from the command
+                cmd = params.get("command", "")
+                # Try to extract path from common patterns
+                file_path = self._extract_path_from_delete_command(cmd)
+                if file_path:
+                    step["agent_type"] = "file"
+                    step["action"] = "delete"
+                    step["parameters"] = {"path": file_path}
+                    agent = "file"
+                    action = "delete"
+                else:
+                    # Can't extract path, drop this step
+                    continue
+
+            # Fill missing step_id / name
+            if "step_id" not in step or not step["step_id"]:
+                step["step_id"] = f"step_{idx + 1}"
+            if "name" not in step or not step["name"]:
+                step["name"] = action if action else f"step_{idx + 1}"
+            if "parameters" not in step and "params" in step:
+                step["parameters"] = step.pop("params")
+            if "parameters" not in step:
+                step["parameters"] = {}
+
+            # Drop vague actions
+            if action in self._VAGUE_ACTIONS or action in VAGUE_ACTIONS:
+                logger.warning(f"Sanitizer: dropping vague step '{action}' (step_id={step.get('step_id')})")
+                continue
+
+            # Drop unknown agent types
+            if agent not in AGENT_TYPES:
+                logger.warning(f"Sanitizer: dropping step with unknown agent_type '{agent}' (step_id={step.get('step_id')})")
+                continue
+
+            # Drop invalid actions for known agent type
+            if agent in AGENT_ACTIONS and action not in AGENT_ACTIONS[agent]:
+                logger.warning(
+                    f"Sanitizer: dropping step with invalid action '{action}' for agent '{agent}' "
+                    f"(step_id={step.get('step_id')}). Valid: {AGENT_ACTIONS[agent]}"
+                )
+                continue
+
+            # Drop duplicate steps (same agent, action, parameters)
+            step_key = (agent, action, str(sorted(step.get("parameters", {}).items())))
+            if step_key in seen_keys:
+                logger.warning(f"Sanitizer: dropping duplicate step '{action}' for agent '{agent}' (step_id={step.get('step_id')})")
+                continue
+            seen_keys.add(step_key)
+
+            sanitized.append(step)
+
+        logger.info(f"Sanitizer: {len(steps)} raw steps -> {len(sanitized)} valid steps")
+        return sanitized
+
+    def _extract_path_from_delete_command(self, cmd: str) -> Optional[str]:
+        """Extract file path from common delete command patterns."""
+        import re
+        # Remove the command verb and flags
+        patterns = [
+            r'(?:remove-item|rm|del|erase|unlink|rmdir|rd)\s+(?:-?\w+\s+)*["\']?([^"\'>\s]+)["\']?',
+            r'(?:remove-item|rm|del|erase|unlink|rmdir|rd)\s+["\']?([^"\'>\s]+)["\']?',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, cmd, re.IGNORECASE)
+            if match:
+                path = match.group(1).strip()
+                # Expand environment variables and user home
+                path = os.path.expandvars(os.path.expanduser(path))
+                return os.path.normpath(path)
+        return None
 
     async def _complete_incomplete_plan(self, prompt: str, steps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """When the 7B model returns only 1 step, complete the plan based on intent."""
@@ -1801,6 +2008,139 @@ class PlannerService:
                         "parameters": {"path": target_path}
                     }
                 ]}
+
+        # Create directory
+        create_dir_match = re.search(r'(?:create|make|mkdir)\s+(?:a\s+)?(?:folder|directory|dir)\s+(?:named?|called?|as)?\s*["\']?(.+?)["\']?\s*$', prompt_lower)
+        if create_dir_match:
+            dir_name = create_dir_match.group(1).strip().strip("\"'")
+            parent_path = os.path.expanduser("~")
+            for keyword in ["desktop", "documents", "downloads"]:
+                if keyword in prompt_lower:
+                    parent_path = get_user_dir(keyword)
+                    break
+            full_path = os.path.join(parent_path, dir_name)
+            return {"steps": [
+                {
+                    "step_id": "step_1",
+                    "name": f"Create directory: {dir_name}",
+                    "agent_type": "file",
+                    "action": "create_directory",
+                    "parameters": {"path": full_path}
+                }
+            ]}
+
+        # Delete file
+        delete_match = re.search(r'(?:delete|remove|rm|erase)\s+(?:the\s+)?(?:file\s+)?["\']?([^\s"\'<>:|*?]+(?:\.\w+)?)["\']?', prompt_lower)
+        if delete_match and not any(k in prompt_lower for k in ["delete folder", "delete directory", "remove folder"]):
+            file_name = delete_match.group(1).strip().strip("\"'")
+            target_path = None
+            for keyword in ["desktop", "documents", "downloads"]:
+                if keyword in prompt_lower:
+                    target_path = get_user_dir(keyword)
+                    break
+            if target_path:
+                full_path = os.path.normpath(os.path.join(target_path, file_name))
+            else:
+                full_path = os.path.normpath(os.path.abspath(file_name))
+            return {"steps": [
+                {
+                    "step_id": "step_1",
+                    "name": f"Delete file: {file_name}",
+                    "agent_type": "file",
+                    "action": "delete",
+                    "parameters": {"path": full_path}
+                }
+            ]}
+
+        # Rename file (only "rename ... as/to", not "move")
+        rename_match = re.search(r'rename\s+(?:the\s+)?(?:file\s+)?["\']?([^\s"\'<>:|*?]+(?:\.\w+)?)["\']?\s+(?:to|as)\s+["\']?([^\s"\'<>:|*?]+(?:\.\w+)?)["\']?', prompt_lower)
+        if rename_match:
+            old_name = rename_match.group(1).strip().strip("\"'")
+            new_name = rename_match.group(2).strip().strip("\"'")
+            target_path = None
+            for keyword in ["desktop", "documents", "downloads"]:
+                if keyword in prompt_lower:
+                    target_path = get_user_dir(keyword)
+                    break
+            if target_path:
+                full_path = os.path.join(target_path, old_name)
+            else:
+                full_path = old_name
+            return {"steps": [
+                {
+                    "step_id": "step_1",
+                    "name": f"Rename {old_name} to {new_name}",
+                    "agent_type": "file",
+                    "action": "rename",
+                    "parameters": {"path": full_path, "new_name": new_name}
+                }
+            ]}
+
+        # Move file (single)
+        move_match = re.search(r'(?:move|copy)\s+(?:the\s+)?(?:file\s+)?["\']?([^\s"\'<>:|*?]+(?:\.\w+)?)["\']?\s+(?:to|into|in)\s+(?:the\s+)?(?:folder\s+)?["\']?([^\s"\'<>:|*?]+)["\']?', prompt_lower)
+        if move_match and "containing" not in prompt_lower and "all" not in prompt_lower.split("move")[0]:
+            src_name = move_match.group(1).strip().strip("\"'")
+            dst_name = move_match.group(2).strip().strip("\"'")
+            is_copy = "copy" in prompt_lower.split(move_match.group(0))[0] if move_match.group(0) in prompt_lower else False
+            base_path = os.path.expanduser("~")
+            for keyword in ["desktop", "documents", "downloads"]:
+                if keyword in prompt_lower:
+                    base_path = get_user_dir(keyword)
+                    break
+            src_path = os.path.join(base_path, src_name)
+            dst_path = os.path.join(base_path, dst_name, src_name)
+            action = "copy" if is_copy else "move"
+            return {"steps": [
+                {
+                    "step_id": "step_1",
+                    "name": f"{'Copy' if is_copy else 'Move'} {src_name} to {dst_name}",
+                    "agent_type": "file",
+                    "action": action,
+                    "parameters": {"source": src_path, "destination": dst_path, "create_parent": True}
+                }
+            ]}
+
+        # Move matching files (keyword/extension-based bulk operations)
+        move_matching_match = re.search(r'(?:move|copy)\s+(?:all\s+)?(?:the\s+)?(?:files?\s+)?(?:containing|with|that\s+(?:have|contain)|matching)\s+["\']?(.+?)["\']?\s+(?:to|into|in)\s+(?:the\s+)?(?:folder\s+)?["\']?(.+?)["\']?\s*$', prompt_lower)
+        if not move_matching_match:
+            move_matching_match = re.search(r'(?:move|copy)\s+(?:all\s+)?(\w+)\s+files?\s+(?:to|into|in)\s+(?:the\s+)?(?:folder\s+)?["\']?(.+?)["\']?\s*$', prompt_lower)
+            if move_matching_match:
+                keyword = move_matching_match.group(1).strip()
+                dest_name = move_matching_match.group(2).strip().strip("\"'")
+                match_type = "extension"
+            else:
+                keyword = ""
+                dest_name = ""
+                match_type = ""
+        if move_matching_match and keyword:
+            if not move_matching_match.group(1).strip().isalpha():
+                keyword = move_matching_match.group(1).strip().strip("\"'")
+                dest_name = move_matching_match.group(2).strip().strip("\"'")
+            base_path = os.path.expanduser("~")
+            for path_kw in ["desktop", "documents", "downloads"]:
+                if path_kw in prompt_lower:
+                    base_path = get_user_dir(path_kw)
+                    break
+            source_dir = base_path
+            dest_dir = os.path.join(base_path, dest_name)
+            if match_type != "extension":
+                match_type = "filename_contains"
+            return {"steps": [
+                {
+                    "step_id": "step_1",
+                    "name": f"Move files matching '{keyword}' to {dest_name}",
+                    "agent_type": "file",
+                    "action": "move_matching",
+                    "parameters": {
+                        "source_directory": source_dir,
+                        "destination_directory": dest_dir,
+                        "match_type": match_type,
+                        "keyword": keyword,
+                        "case_sensitive": False,
+                        "create_destination": True,
+                    }
+                }
+            ]}
 
         # Google / web search tasks
         if any(k in prompt_lower for k in ["google", "search for", "serach for", "look up", "what is", "what are", "who is", "how to"]):

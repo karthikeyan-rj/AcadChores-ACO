@@ -186,6 +186,162 @@ class FileListVerifier(Verifier):
         return VerificationResult(success=True, confidence=0.7, message=f"Directory empty: {path}")
 
 
+class FileDeleteVerifier(Verifier):
+    async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
+        path = result.get("path", "")
+        deleted = result.get("deleted", False)
+        verified = result.get("verified", False)
+        if deleted and verified and path and not os.path.exists(path):
+            return VerificationResult(
+                success=True, confidence=1.0,
+                message=f"File deleted and verified: {path}",
+                diagnostics={"path": path, "size": result.get("size"), "modified": result.get("modified")},
+            )
+        if deleted and path and os.path.exists(path):
+            return VerificationResult(
+                success=False,
+                message=f"Deletion failed: {path} still exists on disk",
+                diagnostics={"path": path},
+            )
+        if not deleted:
+            return VerificationResult(
+                success=False,
+                message=f"Delete action did not complete: {result}",
+                diagnostics={"result": result},
+            )
+        return VerificationResult(
+            success=False,
+            message=f"Deletion unverified: {path}",
+            diagnostics={"path": path, "deleted": deleted, "verified": verified},
+        )
+
+
+class FileMoveVerifier(Verifier):
+    async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
+        if result.get("moved") and result.get("success"):
+            dest = result.get("destination", "")
+            if dest and os.path.exists(dest):
+                return VerificationResult(
+                    success=True, confidence=1.0,
+                    message=f"File moved: {os.path.basename(dest)}",
+                    diagnostics={"source": result.get("source"), "destination": dest},
+                )
+            return VerificationResult(
+                success=True, confidence=0.7,
+                message="File moved (destination not verified on disk)",
+            )
+        return VerificationResult(
+            success=False,
+            message=f"Move failed: {result}",
+            diagnostics={"result": result},
+        )
+
+
+class FileRenameVerifier(Verifier):
+    async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
+        if result.get("renamed") and result.get("success"):
+            new_path = result.get("new_path", "")
+            if new_path and os.path.exists(new_path):
+                return VerificationResult(
+                    success=True, confidence=1.0,
+                    message=f"File renamed to {os.path.basename(new_path)}",
+                    diagnostics={"old_path": result.get("old_path"), "new_path": new_path},
+                )
+            return VerificationResult(
+                success=True, confidence=0.7,
+                message="File renamed (not verified on disk)",
+            )
+        return VerificationResult(
+            success=False,
+            message=f"Rename failed: {result}",
+            diagnostics={"result": result},
+        )
+
+
+class FileCopyVerifier(Verifier):
+    async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
+        if result.get("copied") and result.get("success"):
+            dest = result.get("destination", "")
+            if dest and os.path.exists(dest):
+                return VerificationResult(
+                    success=True, confidence=1.0,
+                    message=f"File copied: {os.path.basename(dest)}",
+                    diagnostics={"source": result.get("source"), "destination": dest},
+                )
+            return VerificationResult(
+                success=True, confidence=0.7,
+                message="File copied (not verified on disk)",
+            )
+        return VerificationResult(
+            success=False,
+            message=f"Copy failed: {result}",
+            diagnostics={"result": result},
+        )
+
+
+class FileCreateDirectoryVerifier(Verifier):
+    async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
+        path = result.get("path", "")
+        if result.get("success") and path:
+            if result.get("created") or result.get("message") == "Directory already exists" or os.path.isdir(path):
+                return VerificationResult(
+                    success=True, confidence=1.0,
+                    message=f"Directory created: {path}",
+                    diagnostics={"path": path},
+                )
+        return VerificationResult(
+            success=False,
+            message=f"Directory creation failed: {result}",
+            diagnostics={"result": result},
+        )
+
+
+class FileFindTextVerifier(Verifier):
+    async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
+        count = result.get("match_count", 0)
+        query = result.get("query", "")
+        if count > 0:
+            return VerificationResult(
+                success=True, message=f"Found {count} match(es) for '{query}'",
+                diagnostics={"match_count": count, "query": query},
+            )
+        return VerificationResult(
+            success=True, confidence=0.6,
+            message=f"No matches found for '{query}' (search completed)",
+            diagnostics={"match_count": 0, "query": query},
+        )
+
+
+class FileMoveMatchingVerifier(Verifier):
+    async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
+        if result.get("success"):
+            moved = result.get("moved_count", 0)
+            matched = result.get("matched_count", 0)
+            skipped = result.get("skipped", [])
+            if moved > 0:
+                return VerificationResult(
+                    success=True, confidence=1.0,
+                    message=f"Moved {moved}/{matched} files. Skipped: {len(skipped)}",
+                    diagnostics={"moved": moved, "matched": matched, "skipped": len(skipped)},
+                )
+            if matched == 0:
+                return VerificationResult(
+                    success=True, confidence=0.7,
+                    message="No matching files found",
+                    diagnostics={"matched": 0},
+                )
+            return VerificationResult(
+                success=True, confidence=0.8,
+                message=f"0 of {matched} files moved (all skipped)",
+                diagnostics={"matched": matched, "skipped": len(skipped)},
+            )
+        return VerificationResult(
+            success=False,
+            message=f"Move matching failed: {result}",
+            diagnostics={"result": result},
+        )
+
+
 class TerminalRunVerifier(Verifier):
     async def verify(self, step: Dict[str, Any], result: Dict[str, Any], context: Dict[str, Any]) -> VerificationResult:
         rc = result.get("returncode", -1)
@@ -217,6 +373,14 @@ class VerificationEngine:
             ("file", "write"): FileWriteVerifier(),
             ("file", "read"): FileReadVerifier(),
             ("file", "list"): FileListVerifier(),
+            ("file", "delete"): FileDeleteVerifier(),
+            ("file", "move"): FileMoveVerifier(),
+            ("file", "rename"): FileRenameVerifier(),
+            ("file", "copy"): FileCopyVerifier(),
+            ("file", "create_directory"): FileCreateDirectoryVerifier(),
+            ("file", "find_text"): FileFindTextVerifier(),
+            ("file", "search"): FileFindTextVerifier(),
+            ("file", "move_matching"): FileMoveMatchingVerifier(),
             ("terminal", "run"): TerminalRunVerifier(),
         }
 

@@ -41,17 +41,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [services, setServices] = useState<ServiceStatus[]>([]);
   const profileRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  const cmdTriggerRef = useRef<HTMLButtonElement>(null);
 
   const checkServices = useCallback(async () => {
     const results: ServiceStatus[] = [];
     try {
-      const health = await api.health();
-      results.push({ name: 'Backend API', status: health ? 'connected' : 'disconnected' });
+      const health = await api.healthDetail();
+      results.push({ name: 'Backend API', status: health.status === 'healthy' ? 'connected' : 'disconnected' });
+
+      // MongoDB status from health endpoint
+      const dbStatus = health.mongodb.status === 'connected' ? 'connected' : 'disconnected';
+      const dbLabel = health.mongodb.mode === 'atlas'
+        ? `Atlas — ${health.mongodb.database || 'aco'}`
+        : health.mongodb.mode === 'local'
+        ? `Local — ${health.mongodb.database || 'aco'}`
+        : 'In-memory (no persistence)';
+      results.push({ name: 'MongoDB', status: dbStatus, label: dbLabel });
+
+      // Redis status
+      const redisStatus = health.redis.status === 'connected' ? 'connected'
+        : health.redis.status === 'disabled' ? 'disabled' : 'disconnected';
+      results.push({ name: 'Redis', status: redisStatus, label: health.redis.status === 'connected' ? 'Connected' : 'Disabled' });
     } catch {
       results.push({ name: 'Backend API', status: 'disconnected' });
+      results.push({ name: 'MongoDB', status: 'disconnected', label: 'Unknown' });
+      results.push({ name: 'Redis', status: 'disconnected', label: 'Unknown' });
     }
-    results.push({ name: 'MongoDB', status: 'connected', label: 'Connected' });
-    results.push({ name: 'Redis', status: 'disabled', label: 'Disabled' });
     results.push({ name: 'Ollama', status: 'connected', label: 'Connected' });
     results.push({ name: 'Browser Agent', status: 'connected', label: 'Ready' });
     results.push({ name: 'Worker Pool', status: 'connected', label: '3 active' });
@@ -152,7 +167,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#08090B] text-[#F4F4F5]">
-      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(s) => { router.push(s); }} />
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(s) => { router.push(s); }} triggerRef={cmdTriggerRef} />
 
       {/* Mobile overlay */}
       <AnimatePresence>
@@ -266,6 +281,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             {/* Search / Command trigger */}
             <button
+              ref={cmdTriggerRef}
               onClick={() => setCmdOpen(true)}
               className="search-shell flex items-center gap-2 px-3 py-1.5 rounded-lg text-[#71717A] text-[11px] hover:border-white/[0.12] hover:text-[#A1A1AA] transition cursor-pointer w-[220px]"
               aria-label="Open command palette"

@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from bson import ObjectId
 
-from app.core.config import settings
+from app.core.config import settings, normalize_email
 from app.core.database import db_manager
 from app.core.security import ALGORITHM
 from app.infrastructure.db.models import User
@@ -14,6 +14,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login
 
 async def _find_user_by_email(email: str):
     """Find a user by email, handling both memory and MongoDB modes."""
+    email = normalize_email(email)
     if db_manager.use_memory:
         user_doc = await memory_db.find_one("users", {"email": email})
         if not user_doc:

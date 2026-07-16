@@ -24,6 +24,47 @@ TASK_EXECUTION_TIMEOUT: float = 300.0
 _MAX_IN_MEMORY_TASKS = 500
 
 
+def _get_error_suggestion(error_type: str, error_msg: str, step_data: Dict[str, Any]) -> str:
+    """Generate a human-readable suggestion based on the error type and context."""
+    agent = step_data.get("agent_type", "")
+    action = step_data.get("action", "")
+    params = step_data.get("parameters", {})
+
+    if error_type == "PermissionError":
+        return "This action requires your permission. Check if a permission prompt appeared."
+    if error_type == "FileNotFoundError":
+        if agent == "file":
+            path = params.get("path", params.get("source", "the target path"))
+            return f"The file or directory '{path}' was not found. Verify the path is correct."
+        return "A required file or resource was not found."
+    if error_type == "FileExistsError":
+        return "A file already exists at the target location. Use a different name or delete the existing file first."
+    if error_type == "IsADirectoryError":
+        return "Expected a file but found a directory. Use 'list' action to inspect directory contents."
+    if error_type == "TimeoutError":
+        return f"The {agent} action timed out. The server may be slow or the resource unavailable. Try again later."
+    if error_type == "RuntimeError":
+        if "Could not click" in error_msg:
+            return "The target element could not be found on the page. The page layout may have changed."
+        if "Could not fill" in error_msg:
+            return "No matching input field found. The form structure may have changed."
+        if "Failed to navigate" in error_msg:
+            return "Navigation failed. Check the URL and your network connection."
+        if "Failed to launch browser" in error_msg:
+            return "Browser failed to start. Try restarting the backend service."
+        if "deletion verification failed" in error_msg:
+            return "File deletion could not be verified. Check file permissions."
+        return f"Runtime error during {agent}/{action}. Check the execution log for details."
+    if error_type == "ValueError":
+        return f"Invalid input for {agent}/{action}. Check the parameters."
+    if error_type == "OSError" or error_type == "IOError":
+        return f"File system error during {action}. Check file permissions and disk space."
+    if error_type == "asyncio.TimeoutError":
+        return f"The {agent} task exceeded the time limit. Try breaking the task into smaller steps."
+
+    return f"An unexpected error occurred during {agent}/{action}. Check the execution log."
+
+
 def _cleanup_task_statuses():
     """Evict oldest completed/failed task statuses if dict grows too large."""
     if len(_in_memory_task_statuses) > _MAX_IN_MEMORY_TASKS:
@@ -183,16 +224,75 @@ class WorkerPool:
                 )
 
             logger.info(f"Worker-{worker_id}: About to execute step {step_data}")
+
+            # Check cancellation before running
             try:
-                # Check if execution was cancelled before running
                 from app.services.state_machine import WorkflowStateMachine, WorkflowState
                 exec_status = await WorkflowStateMachine.get_status(execution_id)
                 if exec_status == WorkflowState.CANCELLED.value:
                     logger.info(f"Worker-{worker_id}: execution {execution_id} is cancelled, skipping task {task_id}")
                     return
+            except Exception:
+                pass
 
+            # Wrap execution with periodic cancellation checks
+            async def _checked_execute():
+                """Execute step with periodic cancellation checks."""
+                from app.services.state_machine import WorkflowStateMachine, WorkflowState
+                result = [None]
+                check_interval = 0.5  # Check every 0.5 seconds for faster cancellation
+                step_task = asyncio.create_task(
+                    self.agent_manager.execute_step(step_data, progress_callback,
+                                                    user_id=step_data.get("user_id"),
+                                                    execution_id=execution_id)
+                )
+                check_task = asyncio.create_task(_periodic_cancel_check(execution_id, check_interval))
+                try:
+                    done, pending = await asyncio.wait(
+                        {step_task, check_task},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    # Cancel whichever is still running
+                    for t in pending:
+                        t.cancel()
+                        try:
+                            await t
+                        except (asyncio.CancelledError, Exception):
+                            pass
+                    # If the step task completed, return its result
+                    if step_task in done:
+                        result[0] = step_task.result()
+                    else:
+                        # Check was cancelled — kill the process and raise
+                        from app.services.process_manager import cancel_process
+                        cancel_process(execution_id)
+                        raise asyncio.CancelledError("Workflow cancelled")
+                    return result[0]
+                except asyncio.CancelledError:
+                    step_task.cancel()
+                    check_task.cancel()
+                    from app.services.process_manager import cancel_process
+                    cancel_process(execution_id)
+                    raise
+
+            async def _periodic_cancel_check(eid: str, interval: float):
+                """Periodically check if the execution was cancelled."""
+                from app.services.state_machine import WorkflowStateMachine, WorkflowState
+                while True:
+                    await asyncio.sleep(interval)
+                    try:
+                        status = await WorkflowStateMachine.get_status(eid)
+                        if status == WorkflowState.CANCELLED.value:
+                            # Cancel the process tree
+                            from app.services.process_manager import cancel_process
+                            cancel_process(eid)
+                            return
+                    except Exception:
+                        pass
+
+            try:
                 result = await asyncio.wait_for(
-                    self.agent_manager.execute_step(step_data, progress_callback, user_id=step_data.get("user_id"), execution_id=execution_id),
+                    _checked_execute(),
                     timeout=TASK_EXECUTION_TIMEOUT,
                 )
             except asyncio.TimeoutError:
@@ -274,11 +374,24 @@ class WorkerPool:
         except Exception as e:
             tb = traceback.format_exc()
             error_msg = str(e) or type(e).__name__ or "Unknown error"
+            error_type = type(e).__name__
             logger.error(f"Worker-{worker_id} failed task {task_id}: {error_msg}\n{tb}")
+
+            # Build structured error details for the frontend
+            error_details = {
+                "message": error_msg,
+                "type": error_type,
+                "agent_type": step_data.get("agent_type", "unknown"),
+                "action": step_data.get("action", "unknown"),
+                "step_name": step_data.get("name", ""),
+                "step_id": step_data.get("step_id", ""),
+                "suggestion": _get_error_suggestion(error_type, error_msg, step_data),
+            }
             
             failed_mapping = {
                 "status": "failed",
-                "error": error_msg
+                "error": error_msg,
+                "error_details": json.dumps(error_details),
             }
             if redis:
                 await redis.hset(f"task:status:{task_id}", mapping=failed_mapping)
@@ -293,6 +406,7 @@ class WorkerPool:
                     "task_id": task_id,
                     "execution_id": execution_id,
                     "error": error_msg,
+                    "error_details": error_details,
                     "step_data": step_data,
                 }
             )

@@ -38,14 +38,16 @@ class WorkflowState(str, Enum):
     COMPLETED = "Completed"
     FAILED = "Failed"
     CANCELLED = "Cancelled"
+    STOPPING = "Stopping"
 
 # Valid transitions map
 VALID_TRANSITIONS = {
     WorkflowState.IDLE: [WorkflowState.PLANNING, WorkflowState.CANCELLED],
     WorkflowState.PLANNING: [WorkflowState.EXECUTING, WorkflowState.FAILED, WorkflowState.CANCELLED],
-    WorkflowState.EXECUTING: [WorkflowState.WAITING, WorkflowState.RETRY, WorkflowState.COMPLETED, WorkflowState.FAILED, WorkflowState.CANCELLED],
+    WorkflowState.EXECUTING: [WorkflowState.WAITING, WorkflowState.RETRY, WorkflowState.COMPLETED, WorkflowState.FAILED, WorkflowState.CANCELLED, WorkflowState.STOPPING],
     WorkflowState.WAITING: [WorkflowState.EXECUTING, WorkflowState.FAILED, WorkflowState.CANCELLED],
     WorkflowState.RETRY: [WorkflowState.EXECUTING, WorkflowState.FAILED, WorkflowState.CANCELLED],
+    WorkflowState.STOPPING: [WorkflowState.CANCELLED, WorkflowState.FAILED],
     WorkflowState.COMPLETED: [],
     WorkflowState.FAILED: [],
     WorkflowState.CANCELLED: []

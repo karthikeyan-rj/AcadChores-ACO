@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from beanie import Document, Link, PydanticObjectId
 from pydantic import BaseModel, Field
+from pymongo import ASCENDING, IndexModel
 
 class User(Document):
     email: str
@@ -10,12 +11,17 @@ class User(Document):
     role: str = "user"  # admin, user, guest
     hashed_password: Optional[str] = None
     google_id: Optional[str] = None
+    account_status: str = "active"  # active, suspended, deactivated
+    last_login_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "users"
-        indexes = ["email", "google_id"]
+        indexes = [
+            "google_id",
+            IndexModel([("email", ASCENDING)], unique=True, name="email_unique_idx"),
+        ]
 
 class Step(BaseModel):
     step_id: str
@@ -196,3 +202,36 @@ class UserSettings(Document):
     class Settings:
         name = "user_settings"
         indexes = ["user_id"]
+
+
+class ChatMessage(Document):
+    user_id: PydanticObjectId
+    conversation_id: str
+    role: str  # user, assistant
+    message_type: str  # user, assistant, workflow_plan, workflow_status, system, error
+    content: str
+    workflow_id: Optional[str] = None
+    execution_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "chat_messages"
+        indexes = ["user_id", "conversation_id", ("user_id", "conversation_id"), ("user_id", "created_at")]
+
+
+class Conversation(Document):
+    conversation_id: str
+    user_id: PydanticObjectId
+    title: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_message_at: Optional[datetime] = None
+
+    class Settings:
+        name = "conversations"
+        indexes = [
+            "user_id",
+            IndexModel([("user_id", ASCENDING), ("conversation_id", ASCENDING)], unique=True, name="user_conversation_idx"),
+            IndexModel([("user_id", ASCENDING), ("last_message_at", ASCENDING)], name="user_last_msg_idx"),
+        ]

@@ -11,7 +11,7 @@ from jose import jwt, JWTError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.core.config import settings
+from app.core.config import settings, normalize_email
 from app.core.database import db_manager
 from app.core.event_bus import event_bus, SystemEvent
 from app.core.security import ALGORITHM
@@ -87,6 +87,7 @@ async def _resolve_ws_user(websocket: WebSocket):
             await websocket.accept()
             await websocket.close(code=4001, reason="Invalid token")
             return None
+        email = normalize_email(email)
         user = await User.find_one(User.email == email)
         if not user:
             await websocket.accept()
@@ -202,7 +203,7 @@ async def health_check():
     return {
         "status": overall,
         "project": settings.PROJECT_NAME,
-        "database": db_health["mongodb"],
+        "mongodb": db_health["mongodb"],
         "redis": db_health["redis"],
     }
 

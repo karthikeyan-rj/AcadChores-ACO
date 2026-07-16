@@ -84,6 +84,11 @@ class CapabilityRegistry:
             Capability("write", "Write content to file"),
             Capability("delete", "Delete a file"),
             Capability("list", "List directory contents"),
+            Capability("create_directory", "Create a new directory"),
+            Capability("move", "Move a file to a new location"),
+            Capability("rename", "Rename a file"),
+            Capability("copy", "Copy a file to a new location"),
+            Capability("move_matching", "Move files matching a keyword or pattern"),
         ])
         self.register("terminal", [
             Capability("run", "Execute a shell command"),

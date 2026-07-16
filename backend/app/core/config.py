@@ -4,6 +4,12 @@ from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, model_validator
 
+
+def normalize_email(email: str) -> str:
+    """Normalize email to lowercase and trimmed. Single source of truth for all auth paths."""
+    return email.strip().lower()
+
+
 _INSECURE_SECRET_DEFAULTS = {
     "CHANGE_ME_TO_A_RANDOM_SECRET_IN_PRODUCTION",
     "SUPER_SECRET_JWTS_TOKENS_SECRET_KEY_ACO_2026",
@@ -30,6 +36,7 @@ class Settings(BaseSettings):
     MONGODB_DATABASE: str = Field(default="aco")
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
     REDIS_ENABLED: bool = Field(default=True)
+    ALLOW_DATABASE_FALLBACK: bool = Field(default=False)
 
     # AI Provider Settings
     AI_PROVIDER: str = Field(default="ollama")
@@ -67,7 +74,7 @@ class Settings(BaseSettings):
     DEFAULT_PERM_BROWSER: str = Field(default="allow")
     DEFAULT_PERM_DESKTOP: str = Field(default="allow")
     DEFAULT_PERM_TERMINAL: str = Field(default="allow")
-    DEFAULT_PERM_FILE_DELETE: str = Field(default="block")
+    DEFAULT_PERM_FILE_DELETE: str = Field(default="allow")
     DEFAULT_PERM_FILE_WRITE: str = Field(default="ask")
     DEFAULT_PERM_REGISTRY: str = Field(default="block")
 

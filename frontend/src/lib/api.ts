@@ -8,6 +8,20 @@ export function setAuthFailureHandler(handler: () => void) {
   _onAuthFailure = handler;
 }
 
+export interface HealthResponse {
+  status: 'healthy' | 'degraded';
+  project: string;
+  mongodb: {
+    status: 'connected' | 'disconnected';
+    mode: 'atlas' | 'local' | 'memory';
+    database: string | null;
+    fallback: boolean;
+  };
+  redis: {
+    status: 'connected' | 'disabled' | 'disconnected';
+  };
+}
+
 function headers(token: string | null): Record<string, string> {
   return {
     'Content-Type': 'application/json',
@@ -34,6 +48,9 @@ async function apiFetch(path: string, opts: RequestInit = {}, token?: string | n
 export const api = {
   health: () => fetch(`${BACKEND}/health`).then(r => r.ok),
 
+  healthDetail: (): Promise<HealthResponse> =>
+    fetch(`${BACKEND}/health`).then(r => r.json()),
+
   me: (token: string) =>
     apiFetch('/api/v1/auth/me', {}, token),
 
@@ -42,10 +59,16 @@ export const api = {
       method: 'POST', body: JSON.stringify({ prompt }),
     }, token),
 
-  chat: (message: string, token: string) =>
+  chat: (message: string, token: string, conversationId?: string) =>
     apiFetch('/api/v1/workflows/chat', {
-      method: 'POST', body: JSON.stringify({ message }),
+      method: 'POST', body: JSON.stringify({ message, conversation_id: conversationId }),
     }, token),
+
+  getConversations: (token: string) =>
+    apiFetch('/api/v1/workflows/conversations', {}, token),
+
+  getConversation: (conversationId: string, token: string) =>
+    apiFetch(`/api/v1/workflows/conversations/${conversationId}`, {}, token),
 
   createWorkflow: (title: string, description: string, steps: any[], token: string) =>
     apiFetch('/api/v1/workflows', { method: 'POST', body: JSON.stringify({ title, description, steps }) }, token),
@@ -61,6 +84,12 @@ export const api = {
 
   getExecution: (executionId: string, token: string) =>
     apiFetch(`/api/v1/executions/${executionId}`, {}, token),
+
+  getActiveWorkflow: (token: string) =>
+    apiFetch('/api/v1/workflows/active', {}, token),
+
+  getEntityContext: (conversationId: string, token: string) =>
+    apiFetch(`/api/v1/workflows/entity-context?conversation_id=${encodeURIComponent(conversationId)}`, {}, token),
 
   abortExecution: (executionId: string, token: string) =>
     apiFetch(`/api/v1/executions/${executionId}/abort`, { method: 'POST' }, token),

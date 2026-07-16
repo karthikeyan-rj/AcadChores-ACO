@@ -18,6 +18,8 @@ from app.services.vision_engine import vision_engine
 from app.services.indexer import file_indexer
 from app.services.process_manager import register_process, unregister_process
 from app.ai import llm_service
+from app.utils.paths import resolve_path, get_allowed_roots, find_file, is_safe_path
+from app.utils.paths import resolve_path, get_allowed_roots, find_file
 
 logger = logging.getLogger(__name__)
 
@@ -974,19 +976,57 @@ class BrowserAgent(BaseAgent):
 
 
 class FileAgent(BaseAgent):
-    # Actions that are always safe (read-only) and do not require permission checks
     _SAFE_ACTIONS = {"find_text", "search", "read", "list"}
 
+    ACTION_ALIASES = {
+        "move_file": "move",
+        "delete_file": "delete",
+        "create_folder": "create_directory",
+        "create_dir": "create_directory",
+        "mkdir": "create_directory",
+        "move_files_by_keyword": "move_matching",
+        "rename_file": "rename",
+        "copy_file": "copy",
+        "read_file": "read",
+        "write_file": "write",
+        "list_files": "list",
+        "search_files": "search",
+        "find_files": "find_text",
+    }
+
+    def _normalize_action(self, action: str) -> str:
+        return self.ACTION_ALIASES.get(action, action)
+
+    def _resolve_path(self, raw: str) -> str:
+        """Resolve a path using the robust path utilities."""
+        return resolve_path(raw)
+
+    def _validate_workspace(self, path: str) -> Optional[str]:
+        ok, reason = is_safe_path(path)
+        if not ok:
+            return reason
+        return None
+
+    def _file_exists(self, path: str) -> bool:
+        return os.path.exists(path) and os.path.isfile(path)
+
+    def _dir_exists(self, path: str) -> bool:
+        return os.path.exists(path) and os.path.isdir(path)
+
+    def _find_file_in_allowed_roots(self, filename: str) -> Optional[str]:
+        """Find a file by name in the allowed roots."""
+        return find_file(filename)
+
     async def execute(self, action: str, params: Dict[str, Any], progress_cb: Callable[[int, str], Any], user_id: str = "default") -> Dict[str, Any]:
+        action = self._normalize_action(action)
         await progress_cb(10, f"File action request: {action}")
 
-        # Only gate destructive/write actions through the Permission Guard
         if action not in self._SAFE_ACTIONS:
             authorized = await permission_guard.authorize_action("file", action, params)
             if not authorized:
                 raise PermissionError(f"Permission denied for file action: {action}")
 
-        result = {}
+        result: Dict[str, Any] = {}
 
         if action in ("find_text", "search"):
             query = params.get("text", params.get("query", params.get("path", "")))
@@ -996,69 +1036,90 @@ class FileAgent(BaseAgent):
                 uid = ObjectId(user_id) if user_id and user_id != "default" else ObjectId()
                 raw_results = await file_indexer.search(query, uid)
                 result = {
-                    "success": True,
-                    "query": query,
+                    "success": True, "query": query,
                     "match_count": len(raw_results),
-                    "matches": [{"file_name": r.get("file_name", "") if isinstance(r, dict) else r.file_name, "file_path": r.get("file_path", "") if isinstance(r, dict) else r.file_path} for r in raw_results]
+                    "matches": [{"file_name": r.get("file_name", "") if isinstance(r, dict) else r.file_name, "file_path": r.get("file_path", "") if isinstance(r, dict) else r.file_path} for r in raw_results],
                 }
             except Exception as e:
-                logger.warning(f"File search failed, returning empty results: {e}")
+                logger.warning(f"File search failed: {e}")
                 result = {"success": True, "query": query, "match_count": 0, "matches": []}
+
         elif action == "read":
-            path = params.get("path", "")
-            path = os.path.expanduser(path)
-            path = os.path.expandvars(path)
+            path = self._resolve_path(params.get("path", ""))
             await progress_cb(50, f"Reading file: {path}")
             if not os.path.exists(path):
                 raise FileNotFoundError(f"File not found: {path}")
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 result = {"content": f.read()}
+
         elif action == "write":
             path = params.get("path", "")
             filename = params.get("filename", "")
             content = params.get("content", "")
             if filename and not path:
-                # Visible output directory in user's home
                 output_dir = os.path.join(os.path.expanduser("~"), "ACO_Output")
                 os.makedirs(output_dir, exist_ok=True)
                 path = os.path.join(output_dir, filename)
             elif path:
-                path = os.path.expanduser(path)
-                path = os.path.expandvars(path)
+                path = self._resolve_path(path)
             else:
                 raise ValueError("write action requires either 'path' or 'filename' parameter")
-            # Block writes to system directories
-            block_reason = _is_path_blocked(path, "write")
-            if block_reason:
-                raise PermissionError(block_reason)
+            block = self._validate_workspace(path)
+            if block:
+                raise PermissionError(block)
             await progress_cb(50, f"Writing file: {path}")
-            os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
+            parent = os.path.dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             result = {"success": True, "path": path}
+
         elif action == "delete":
-            path = params.get("path", "")
-            path = os.path.expanduser(path)
-            path = os.path.expandvars(path)
-            # Block deletes to system directories
-            block_reason = _is_path_blocked(path, "delete")
-            if block_reason:
-                raise PermissionError(block_reason)
+            path = self._resolve_path(params.get("path", ""))
+            block = self._validate_workspace(path)
+            if block:
+                raise PermissionError(block)
+            # If path doesn't exist, try to find the file by name in allowed roots
+            if not os.path.exists(path):
+                filename = os.path.basename(path)
+                found_path = self._find_file_in_allowed_roots(filename)
+                if found_path:
+                    logger.info(f"File not found at exact path, found at: {found_path}")
+                    path = found_path
+                else:
+                    raise FileNotFoundError(f"File not found: {path} (also searched in allowed roots)")
+            if os.path.isdir(path):
+                raise IsADirectoryError(f"Cannot delete directory '{path}' through file.delete. Use file.create_directory or terminal.")
+            try:
+                file_size = os.path.getsize(path)
+                file_mtime = os.path.getmtime(path)
+                import time
+                file_mtime_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(file_mtime))
+            except OSError:
+                file_size = 0
+                file_mtime_str = None
             await progress_cb(70, f"Deleting file: {path}")
+            os.remove(path)
+            await progress_cb(85, f"Verifying deletion: {path}")
             if os.path.exists(path):
-                os.remove(path)
-            result = {"deleted": True, "path": path}
+                raise RuntimeError(f"File deletion verification failed: {path} still exists after unlink()")
+            result = {
+                "deleted": True,
+                "path": path,
+                "verified": True,
+                "filename": os.path.basename(path),
+                "size": file_size,
+                "modified": file_mtime_str,
+            }
+
         elif action == "list":
-            path = params.get("path", "")
-            path = os.path.expanduser(path)
-            path = os.path.expandvars(path)
+            path = self._resolve_path(params.get("path", "")) if params.get("path") else os.path.expanduser("~")
             limit = params.get("limit", 0)
             extension = params.get("extension", params.get("ext", "")).lower()
             pattern = params.get("pattern", "").lower()
             recursive = params.get("recursive", False)
-            if not path:
-                path = os.path.expanduser("~")
-            await progress_cb(50, f"Listing directory: {path}" + (f" (filter: *.{extension})" if extension else ""))
+            await progress_cb(50, f"Listing directory: {path}")
             if not os.path.isdir(path):
                 raise FileNotFoundError(f"Directory not found: {path}")
             entries = []
@@ -1076,9 +1137,7 @@ class FileAgent(BaseAgent):
                         except Exception:
                             mtime = 0
                         entries.append({
-                            "name": entry,
-                            "path": full,
-                            "relative_path": rel,
+                            "name": entry, "path": full, "relative_path": rel,
                             "is_dir": os.path.isdir(full),
                             "size": os.path.getsize(full) if os.path.isfile(full) else None,
                             "modified": mtime,
@@ -1095,8 +1154,7 @@ class FileAgent(BaseAgent):
                     except Exception:
                         mtime = 0
                     entries.append({
-                        "name": entry,
-                        "path": full,
+                        "name": entry, "path": full,
                         "is_dir": os.path.isdir(full),
                         "size": os.path.getsize(full) if os.path.isfile(full) else None,
                         "modified": mtime,
@@ -1105,6 +1163,156 @@ class FileAgent(BaseAgent):
             if limit > 0:
                 entries = entries[:limit]
             result = {"path": path, "entries": entries, "count": len(entries)}
+
+        elif action == "create_directory":
+            path = self._resolve_path(params.get("path", ""))
+            block = self._validate_workspace(path)
+            if block:
+                raise PermissionError(block)
+            if os.path.exists(path):
+                if os.path.isdir(path):
+                    result = {"success": True, "path": path, "message": "Directory already exists"}
+                    return result
+                raise FileExistsError(f"A file already exists at '{path}'. Cannot create directory.")
+            await progress_cb(50, f"Creating directory: {path}")
+            os.makedirs(path, exist_ok=True)
+            result = {"success": True, "path": path, "created": True}
+
+        elif action == "move":
+            source = self._resolve_path(params.get("source", ""))
+            dest = self._resolve_path(params.get("destination", ""))
+            create_parent = params.get("create_parent", True)
+            block_s = self._validate_workspace(source)
+            if block_s:
+                raise PermissionError(f"Source: {block_s}")
+            block_d = self._validate_workspace(dest)
+            if block_d:
+                raise PermissionError(f"Destination: {block_d}")
+            if not os.path.exists(source):
+                raise FileNotFoundError(f"Source not found: {source}")
+            if os.path.isdir(source):
+                raise IsADirectoryError(f"Cannot move directory '{source}' through file.move.")
+            if os.path.exists(dest) and os.path.isfile(dest):
+                raise FileExistsError(f"Destination file already exists: {dest}")
+            await progress_cb(50, f"Moving: {source} → {dest}")
+            parent = os.path.dirname(dest)
+            if parent and create_parent:
+                os.makedirs(parent, exist_ok=True)
+            os.rename(source, dest)
+            if not os.path.exists(dest):
+                raise OSError(f"Move verification failed: source absent, dest absent")
+            if os.path.exists(source):
+                raise OSError(f"Move verification failed: source still exists")
+            result = {"success": True, "source": source, "destination": dest, "moved": True}
+
+        elif action == "rename":
+            path = self._resolve_path(params.get("path", ""))
+            new_name = params.get("new_name", "").strip()
+            if not new_name:
+                raise ValueError("rename requires 'new_name' parameter")
+            block = self._validate_workspace(path)
+            if block:
+                raise PermissionError(block)
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"File not found: {path}")
+            dest = os.path.join(os.path.dirname(path), new_name)
+            dest = self._resolve_path(dest)
+            if os.path.exists(dest):
+                raise FileExistsError(f"A file named '{new_name}' already exists in the same directory")
+            await progress_cb(50, f"Renaming: {os.path.basename(path)} → {new_name}")
+            os.rename(path, dest)
+            result = {"success": True, "old_path": path, "new_path": dest, "renamed": True}
+
+        elif action == "copy":
+            source = self._resolve_path(params.get("source", ""))
+            dest = self._resolve_path(params.get("destination", ""))
+            create_parent = params.get("create_parent", True)
+            block_s = self._validate_workspace(source)
+            if block_s:
+                raise PermissionError(f"Source: {block_s}")
+            block_d = self._validate_workspace(dest)
+            if block_d:
+                raise PermissionError(f"Destination: {block_d}")
+            if not os.path.exists(source):
+                raise FileNotFoundError(f"Source not found: {source}")
+            if os.path.isdir(source):
+                raise IsADirectoryError(f"Cannot copy directory '{source}' through file.copy.")
+            if os.path.exists(dest):
+                raise FileExistsError(f"Destination already exists: {dest}")
+            await progress_cb(50, f"Copying: {source} → {dest}")
+            parent = os.path.dirname(dest)
+            if parent and create_parent:
+                os.makedirs(parent, exist_ok=True)
+            import shutil
+            shutil.copy2(source, dest)
+            if not os.path.exists(dest):
+                raise OSError("Copy verification failed")
+            result = {"success": True, "source": source, "destination": dest, "copied": True}
+
+        elif action == "move_matching":
+            source_dir = self._resolve_path(params.get("source_directory", ""))
+            dest_dir = self._resolve_path(params.get("destination_directory", ""))
+            match_type = params.get("match_type", "filename_contains")
+            keyword = params.get("keyword", "")
+            case_sensitive = params.get("case_sensitive", False)
+            create_dest = params.get("create_destination", True)
+
+            block_s = self._validate_workspace(source_dir)
+            if block_s:
+                raise PermissionError(f"Source directory: {block_s}")
+            block_d = self._validate_workspace(dest_dir)
+            if block_d:
+                raise PermissionError(f"Destination directory: {block_d}")
+
+            if not os.path.isdir(source_dir):
+                raise FileNotFoundError(f"Source directory not found: {source_dir}")
+            if match_type not in ("filename_contains", "filename_starts_with", "filename_ends_with", "extension", "exact_filename"):
+                raise ValueError(f"Unsupported match_type: '{match_type}'")
+
+            await progress_cb(20, f"Scanning {source_dir} for files matching '{keyword}' ({match_type})")
+
+            if create_dest:
+                os.makedirs(dest_dir, exist_ok=True)
+            elif not os.path.isdir(dest_dir):
+                raise FileNotFoundError(f"Destination directory not found: {dest_dir}")
+
+            matched = []
+            for entry in os.listdir(source_dir):
+                full = os.path.join(source_dir, entry)
+                if not os.path.isfile(full):
+                    continue
+                if self._match_file(entry, match_type, keyword, case_sensitive):
+                    matched.append((entry, full))
+
+            await progress_cb(50, f"Found {len(matched)} matching file(s)")
+
+            moved = []
+            skipped = []
+            for name, src_path in matched:
+                dst_path = os.path.join(dest_dir, name)
+                if os.path.exists(dst_path):
+                    skipped.append({"file": name, "reason": "destination already exists"})
+                    continue
+                try:
+                    os.rename(src_path, dst_path)
+                    if os.path.exists(dst_path) and not os.path.exists(src_path):
+                        moved.append(name)
+                    else:
+                        skipped.append({"file": name, "reason": "move verification failed"})
+                except Exception as e:
+                    skipped.append({"file": name, "reason": str(e)})
+
+            await progress_cb(100, f"Moved {len(moved)} file(s), skipped {len(skipped)}")
+            result = {
+                "success": True,
+                "source_directory": source_dir,
+                "destination_directory": dest_dir,
+                "matched_count": len(matched),
+                "moved_count": len(moved),
+                "moved_files": moved,
+                "skipped": skipped,
+            }
+
         else:
             raise ValueError(f"Unknown file action: {action}")
 

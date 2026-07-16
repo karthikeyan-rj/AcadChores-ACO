@@ -2,64 +2,11 @@
 Authorization tests for ACO backend API.
 """
 import pytest
-from starlette.testclient import TestClient
-from app.main import app
-from app.core.rate_limit import limiter
-from app.core.config import settings
 from app.core.database import db_manager
-from app.infrastructure.memory_db import _in_memory_collections
 
 
-@pytest.fixture(autouse=True)
-def _clear_state():
-    """Reset rate limiter, memory DB, and MongoDB test users before each test."""
-    # Reset slowapi rate limiter storage
-    storage = limiter._storage
-    if hasattr(storage, 'reset'):
-        storage.reset()
-    elif hasattr(storage, 'storage') and hasattr(storage.storage, 'clear'):
-        storage.storage.clear()
-
-    # Clear in-memory collections
-    for coll in _in_memory_collections.values():
-        coll.clear()
-
-    yield
-
-    # Cleanup after test
-    for coll in _in_memory_collections.values():
-        coll.clear()
-    if hasattr(storage, 'reset'):
-        storage.reset()
-    elif hasattr(storage, 'storage') and hasattr(storage.storage, 'clear'):
-        storage.storage.clear()
-
-
-@pytest.fixture
-def client():
-    with TestClient(app, raise_server_exceptions=False) as c:
-        yield c
-
-
-def _purge_test_users():
-    """Delete all test users from MongoDB."""
-    import pymongo
-    client = pymongo.MongoClient("mongodb://localhost:27017")
-    try:
-        db = client[settings.MONGODB_DATABASE]
-        db.users.delete_many({})
-    except Exception:
-        pass
-    finally:
-        client.close()
-
-
-@pytest.fixture(autouse=True)
-def _cleanup_mongo_users():
-    """Delete test users from MongoDB before and after each test."""
-    _purge_test_users()
-    yield
-    _purge_test_users()
+def _auth(token):
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _register(client, email, name, password="Test1234!"):
@@ -68,10 +15,6 @@ def _register(client, email, name, password="Test1234!"):
     })
     assert resp.status_code == 200, f"Register failed ({email}): {resp.text}"
     return resp.json()["access_token"], resp.json()["user"]
-
-
-def _auth(token):
-    return {"Authorization": f"Bearer {token}"}
 
 
 # ── Unauthenticated access returns 401 ───────────────────────────────

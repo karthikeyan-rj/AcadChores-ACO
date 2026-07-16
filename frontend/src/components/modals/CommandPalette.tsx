@@ -13,6 +13,7 @@ interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
   onNavigate: (section: string) => void;
+  triggerRef?: React.RefObject<HTMLButtonElement>;
 }
 
 interface PaletteItem {
@@ -48,7 +49,7 @@ const allItems: PaletteItem[] = [
   { id: 'act-clear-memory', icon: <Database size={14} className="text-[#F87171]" />, label: 'Clear Memory', description: 'Reset stored context', category: 'Actions', action: '/memory', keywords: ['reset', 'clear', 'delete', 'cache'] },
 ];
 
-export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, onNavigate, triggerRef }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,13 +67,19 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        if (open) onClose();
+        if (open) {
+          onClose();
+          setTimeout(() => triggerRef?.current?.focus(), 50);
+        }
       }
-      if (e.key === 'Escape' && open) onClose();
+      if (e.key === 'Escape' && open) {
+        onClose();
+        setTimeout(() => triggerRef?.current?.focus(), 50);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  }, [open, onClose, triggerRef]);
 
   const filtered = useMemo(() => {
     if (!query) return allItems;
@@ -109,6 +116,7 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
         e.preventDefault();
         onNavigate(filtered[selectedIdx].action);
         onClose();
+        setTimeout(() => triggerRef?.current?.focus(), 50);
       }
     };
     window.addEventListener('keydown', handler);
@@ -145,7 +153,7 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
           onClick={(e) => e.stopPropagation()}
         >
           {/* Search input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07]">
+          <div className="command-palette-search flex items-center gap-3 px-4 py-3 border-b border-white/[0.07]">
             <Search size={16} className="text-[#71717A] shrink-0" />
             <input
               ref={inputRef}
@@ -177,7 +185,7 @@ export function CommandPalette({ open, onClose, onNavigate }: CommandPaletteProp
                       <button
                         key={item.id}
                         data-idx={idx}
-                        onClick={() => { onNavigate(item.action); onClose(); }}
+                        onClick={() => { onNavigate(item.action); onClose(); setTimeout(() => triggerRef?.current?.focus(), 50); }}
                         onMouseEnter={() => setSelectedIdx(idx)}
                         className={cn(
                           'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition text-sm cursor-pointer',

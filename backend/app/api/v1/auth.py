@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.core.database import db_manager
 from app.core.rate_limit import limiter
-from app.core.config import settings
+from app.core.config import settings, normalize_email
 from app.core.security import (
     verify_password, get_password_hash, create_access_token, create_refresh_token
 )
@@ -65,19 +65,22 @@ def _token_response(user) -> dict:
 @router.post("/register", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_REGISTER)
 async def register(request: Request, req: RegisterRequest):
+    email = normalize_email(req.email)
+
     if db_manager.use_memory:
-        existing = await memory_db.find_one("users", {"email": req.email})
+        existing = await memory_db.find_one("users", {"email": email})
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered.")
 
         hashed_pw = get_password_hash(req.password)
         user_doc = {
-            "email": req.email,
+            "email": email,
             "name": req.name,
             "hashed_password": hashed_pw,
             "avatar_url": None,
             "google_id": None,
             "role": "user",
+            "account_status": "active",
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat(),
         }
@@ -85,16 +88,16 @@ async def register(request: Request, req: RegisterRequest):
         user_doc["_id"] = oid
         return _token_response(user_doc)
 
-    existing_user = await User.find_one(User.email == req.email)
+    existing_user = await User.find_one(User.email == email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered.")
 
     hashed_pw = get_password_hash(req.password)
     user = User(
-        email=req.email,
+        email=email,
         name=req.name,
         hashed_password=hashed_pw,
-        role="user"
+        role="user",
     )
     await user.insert()
     return _token_response(user)
@@ -102,41 +105,51 @@ async def register(request: Request, req: RegisterRequest):
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(request: Request, req: LoginRequest):
+    email = normalize_email(req.email)
+
     if db_manager.use_memory:
-        user_doc = await memory_db.find_one("users", {"email": req.email})
+        user_doc = await memory_db.find_one("users", {"email": email})
         if not user_doc:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         if not verify_password(req.password, user_doc.get("hashed_password", "")):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
+        await memory_db.update("users", {"_id": user_doc["_id"]}, {"last_login_at": datetime.utcnow().isoformat()})
         return _token_response(user_doc)
 
-    user = await User.find_one(User.email == req.email)
+    user = await User.find_one(User.email == email)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
     if not verify_password(req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
+    user.last_login_at = datetime.utcnow()
+    await user.save()
     return _token_response(user)
 
 @router.post("/login/form", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login_form(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    email = normalize_email(form_data.username)
+
     if db_manager.use_memory:
-        user_doc = await memory_db.find_one("users", {"email": form_data.username})
+        user_doc = await memory_db.find_one("users", {"email": email})
         if not user_doc:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         if not verify_password(form_data.password, user_doc.get("hashed_password", "")):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
+        await memory_db.update("users", {"_id": user_doc["_id"]}, {"last_login_at": datetime.utcnow().isoformat()})
         return _token_response(user_doc)
 
-    user = await User.find_one(User.email == form_data.username)
+    user = await User.find_one(User.email == email)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
     if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
+    user.last_login_at = datetime.utcnow()
+    await user.save()
     return _token_response(user)
 
 @router.post("/google", response_model=TokenResponse)
@@ -154,7 +167,7 @@ async def google_auth(request: Request, req: GoogleAuthRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid Google token: {e}")
 
-    google_email = payload.get("email")
+    google_email = normalize_email(payload.get("email", ""))
     google_name = payload.get("name", "")
     google_picture = payload.get("picture", "")
     google_sub = payload.get("sub", "")

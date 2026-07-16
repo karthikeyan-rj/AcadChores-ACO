@@ -587,12 +587,12 @@ class TestPermissionGuard:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_block_file_delete_by_default(self):
-        """File delete should be blocked by default"""
+    async def test_file_delete_allowed_by_default(self):
+        """File delete should be allowed by default (security gate is the frontend confirmation dialog)"""
         from app.core.security import PermissionGuard
         guard = PermissionGuard()
         result = await guard.authorize_action("file", "delete", {"path": "/tmp/test"})
-        assert result is False
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_block_registry_by_default(self):

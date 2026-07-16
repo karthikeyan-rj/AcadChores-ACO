@@ -139,8 +139,10 @@ class WorkflowEngine:
         return execution_id
 
     async def abort_execution(self, execution_id: str) -> None:
-        await WorkflowStateMachine.transition_to(execution_id, WorkflowState.CANCELLED)
+        await WorkflowStateMachine.transition_to(execution_id, WorkflowState.STOPPING)
         logger.info(f"Execution {execution_id} requested cancellation.")
+        # Immediately cancel any running task
+        await WorkflowStateMachine.transition_to(execution_id, WorkflowState.CANCELLED)
 
     async def _dispatch_next_step(self, execution_id: str, workflow=None) -> None:
         exec_doc = await _find_exec(execution_id)
@@ -272,7 +274,11 @@ class WorkflowEngine:
         verification = payload.get("verification", {})
 
         exec_doc = await _find_exec(execution_id)
-        if not exec_doc or exec_doc.get("status") != WorkflowState.EXECUTING.value:
+        if not exec_doc or exec_doc.get("status") not in (WorkflowState.EXECUTING.value, WorkflowState.RETRY.value):
+            return
+
+        # Prevent recovery after cancellation
+        if exec_doc.get("status") == WorkflowState.CANCELLED.value:
             return
 
         step_id = step_data.get("step_id", "")
@@ -287,8 +293,23 @@ class WorkflowEngine:
 
         if recovery_action.strategy == RecoveryStrategy.ABORT:
             error_msg = recovery_action.message or f"Verification failed after recovery: {verification.get('message', '')}"
+            step_name = step_data.get("name", step_data.get("action", ""))
+            agent_type = step_data.get("agent_type", "unknown")
+            action = step_data.get("action", "unknown")
+            abort_details = {
+                "message": error_msg,
+                "type": "VerificationError",
+                "agent_type": agent_type,
+                "action": action,
+                "step_name": step_name,
+                "step_id": step_id,
+                "suggestion": f"Step '{step_name}' failed verification. The {agent_type}/{action} action did not produce the expected result.",
+            }
             await self._log_failure(execution_id, step_data, error_msg)
-            await WorkflowStateMachine.transition_to(execution_id, WorkflowState.FAILED, error_message=error_msg)
+            await WorkflowStateMachine.transition_to(
+                execution_id, WorkflowState.FAILED, error_message=error_msg,
+                metadata={"error_details": abort_details},
+            )
             return
 
         if recovery_action.delay_seconds > 0:
@@ -313,9 +334,14 @@ class WorkflowEngine:
         execution_id = payload.get("execution_id")
         error_msg = payload.get("error", "Unknown error")
         step_data = payload.get("step_data", {})
+        error_details = payload.get("error_details", {})
 
         exec_doc = await _find_exec(execution_id)
-        if not exec_doc or exec_doc.get("status") != WorkflowState.EXECUTING.value:
+        if not exec_doc or exec_doc.get("status") not in (WorkflowState.EXECUTING.value, WorkflowState.RETRY.value):
+            return
+
+        # Prevent recovery after cancellation
+        if exec_doc.get("status") == WorkflowState.CANCELLED.value:
             return
 
         # Try recovery before failing
@@ -371,7 +397,10 @@ class WorkflowEngine:
             )
             await log_entry.insert()
 
-        await WorkflowStateMachine.transition_to(execution_id, WorkflowState.FAILED, error_message=error_msg)
+        await WorkflowStateMachine.transition_to(
+            execution_id, WorkflowState.FAILED, error_message=error_msg,
+            metadata={"error_details": error_details} if error_details else None,
+        )
         logger.error(f"Workflow execution {execution_id} halted on step failure: {error_msg}")
 
 workflow_engine = WorkflowEngine()

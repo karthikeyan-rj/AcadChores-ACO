@@ -24,6 +24,7 @@ _in_memory_collections: Dict[str, Dict[str, Any]] = {
     "index_jobs": {},
     "user_api_keys": {},
     "user_settings": {},
+    "chat_messages": {},
 }
 
 def _load_from_disk():

@@ -19,7 +19,7 @@ AGENT_TYPES = {
 
 BROWSER_ACTIONS = {"navigate", "click", "fill", "press", "wait", "wait_for_selector", "scrape_text", "scrape_links", "summarize", "search", "type", "scroll", "select", "open", "close"}
 TERMINAL_ACTIONS = {"run"}
-FILE_ACTIONS = {"read", "write", "list", "delete", "find_text", "search"}
+FILE_ACTIONS = {"read", "write", "list", "delete", "find_text", "search", "create_directory", "move", "rename", "copy", "move_matching"}
 DESKTOP_ACTIONS = {"click", "type", "press"}
 APPLICATION_ACTIONS = {"open", "close", "focus", "minimize", "maximize"}
 COMPUTER_ACTIONS = {"screenshot", "mouse_click", "mouse_move", "type_text", "press_key", "hotkey", "scroll"}
@@ -43,6 +43,23 @@ AGENT_ACTIONS: Dict[str, set] = {
 
 VAGUE_ACTIONS = {"do_something", "handle", "process", "execute", "perform", "run_task", "task", "action", "step", "do", "make", "setup"}
 VAGUE_NAMES = {"step", "task", "action", "item", "thing", "process", "do_something", "handle", "process_data"}
+
+# Terminal delete command patterns that should use file.delete instead
+TERMINAL_DELETE_PATTERNS = {
+    "remove-item", "del ", "del/", "rm ", "rm -", "rmdir", "erase ",
+    "remove item", "del /", "rd /", "rd ", "unlink",
+}
+
+
+def _is_terminal_delete_command(command: str) -> bool:
+    """Check if a terminal command is attempting file deletion."""
+    cmd = command.lower().strip()
+    if not cmd:
+        return False
+    for pattern in TERMINAL_DELETE_PATTERNS:
+        if pattern in cmd:
+            return True
+    return False
 
 
 class WorkflowValidationError:
@@ -216,6 +233,17 @@ class WorkflowValidator:
                 self._errors.append(WorkflowValidationError(
                     "vague_actions.vague_name", f"Step uses vague name: '{name}'.", "warning", step.get("step_id")
                 ))
+            # Check for terminal delete commands that should use file.delete
+            if step.get("agent_type") == "terminal" and action == "run":
+                params = step.get("parameters", {})
+                command = params.get("command", "")
+                if _is_terminal_delete_command(command):
+                    self._errors.append(WorkflowValidationError(
+                        "structure.terminal_delete_not_allowed", 
+                        "File deletion must use the File Agent (agent_type: 'file', action: 'delete'). Terminal delete commands are not allowed.", 
+                        "error", 
+                        step.get("step_id")
+                    ))
 
     def _check_duplicates(self, workflow: Dict[str, Any]):
         steps = workflow.get("steps", [])
@@ -250,6 +278,12 @@ class WorkflowValidator:
             ("file", "write"): ["path", "content"],
             ("file", "list"): [],
             ("file", "find_text"): ["query"],
+            ("file", "delete"): ["path"],
+            ("file", "create_directory"): ["path"],
+            ("file", "move"): ["source", "destination"],
+            ("file", "rename"): ["path", "new_name"],
+            ("file", "copy"): ["source", "destination"],
+            ("file", "move_matching"): ["source_directory", "destination_directory", "keyword"],
             ("desktop", "click"): ["target"],
             ("desktop", "type"): ["text"],
             ("desktop", "press"): ["key"],

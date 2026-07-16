@@ -64,6 +64,15 @@ class RecoveryEngine:
         action = step.get("action", "")
         params = step.get("parameters", {})
 
+        # Check if this is a destructive action that should not be retried
+        is_destructive = self._is_destructive_action(agent_type, action, params)
+        if is_destructive and attempt > 1:
+            logger.warning(f"Destructive action {agent_type}/{action} failed, not retrying (attempt {attempt})")
+            return RecoveryAction(
+                strategy=RecoveryStrategy.ABORT,
+                message=f"Destructive action {agent_type}/{action} failed after {attempt} attempts. Not retrying to prevent data loss.",
+            )
+
         logger.info(f"Recovery attempt {attempt} for {agent_type}/{action} [{step_id}]")
 
         # Abort immediately for "command not found" errors — retrying won't help
@@ -171,6 +180,22 @@ class RecoveryEngine:
             message=f"Retry #{attempt}",
             delay_seconds=1.0,
         )
+
+    def _is_destructive_action(self, agent_type: str, action: str, params: Dict[str, Any]) -> bool:
+        """Check if an action is destructive and should not be retried."""
+        # File deletion
+        if agent_type == "file" and action == "delete":
+            return True
+        # Terminal delete commands
+        if agent_type == "terminal" and action == "run":
+            cmd = params.get("command", "").lower()
+            delete_patterns = ["remove-item", "del ", "del/", "rm ", "rm -", "rmdir", "erase ", "unlink"]
+            if any(pattern in cmd for pattern in delete_patterns):
+                return True
+        # File move/rename (could overwrite)
+        if agent_type == "file" and action in ("move", "rename", "move_matching"):
+            return True
+        return False
 
     def reset_attempts(self, step_id: str) -> None:
         self._attempts.pop(step_id, None)

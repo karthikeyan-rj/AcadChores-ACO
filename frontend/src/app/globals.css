@@ -132,6 +132,19 @@ html.app-page, html.app-page body {
     outline: none;
     box-shadow: none;
   }
+
+  /* Command palette focus-within: suppress native input outline, apply container glow */
+  .command-palette-search {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .command-palette-search:focus-within {
+    border-color: rgba(124,58,237,0.5) !important;
+    box-shadow: 0 0 0 1px rgba(124,58,237,0.2), 0 2px 12px rgba(124,58,237,0.06);
+  }
+  .command-palette-search input {
+    outline: none !important;
+    box-shadow: none !important;
+  }
 }
 
 /* Textarea: remove native resize, outline, and inner shadows */
