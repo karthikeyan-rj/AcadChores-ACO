@@ -311,6 +311,7 @@ class TestFileAgentUnknownAction:
 
 class TestCrossUserWorkspace:
     @pytest.mark.asyncio
+    @pytest.mark.real_workspace
     async def test_blocked_system_path(self, file_agent):
         with pytest.raises(PermissionError):
             await file_agent.execute("delete", {"path": "C:\\Windows\\test.txt"}, _noop_progress)

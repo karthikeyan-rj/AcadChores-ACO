@@ -51,36 +51,35 @@ export function ExecutionPanel({ stateMachineStatus, activeStepIndex, totalSteps
   const confidence = 0;
 
   return (
-    <div className="rounded-[10px] border border-white/[0.07] bg-[#121419] p-4 space-y-4">
+    <div className="rounded-xl border border-theme bg-surface p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#71717A]">Execution</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-theme-tertiary">Execution</span>
         {isExecuting && (
-          <span className="flex items-center gap-1.5 text-[10px] text-[#ADFF2F]">
+          <span className="flex items-center gap-1.5 text-[10px] text-status-active">
             <Loader2 size={10} className="animate-spin" />
             Running
           </span>
         )}
         {isCompleted && (
-          <span className="flex items-center gap-1.5 text-[10px] text-[#4ADE80]">
+          <span className="flex items-center gap-1.5 text-[10px] text-status-active">
             <CheckCircle2 size={10} />
             Done
           </span>
         )}
       </div>
 
-      {/* Progress bar */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[10px]">
-          <span className="text-[#71717A]">
+          <span className="text-theme-secondary">
             Step {Math.max(0, activeStepIndex + 1)} of {totalSteps}
           </span>
-          <span className="text-[#A1A1AA]">{pct}%</span>
+          <span className="text-theme-tertiary">{pct}%</span>
         </div>
-        <div className="h-1.5 bg-[#0D0F12] rounded-full overflow-hidden">
+        <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
           <motion.div
             className={cn(
               'h-full rounded-full',
-              isFailed ? 'bg-[#F87171]' : isExecuting ? 'bg-[#ADFF2F]' : 'bg-[#7C3AED]'
+              isFailed ? 'bg-status-error' : isExecuting ? 'bg-status-active' : 'bg-text-primary'
             )}
             initial={{ width: 0 }}
             animate={{ width: `${pct}%` }}
@@ -89,49 +88,48 @@ export function ExecutionPanel({ stateMachineStatus, activeStepIndex, totalSteps
         </div>
       </div>
 
-      {/* Current step info */}
       {currentStepName && (
-        <div className="flex items-center gap-3 p-3 rounded-[10px] bg-[#0D0F12] border border-white/[0.07]">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-2 border border-theme">
           {isExecuting ? (
-            <Loader2 size={14} className="text-[#ADFF2F] animate-spin shrink-0" />
+            <Loader2 size={14} className="text-status-active animate-spin shrink-0" />
           ) : isCompleted ? (
-            <CheckCircle2 size={14} className="text-[#4ADE80] shrink-0" />
+            <CheckCircle2 size={14} className="text-status-active shrink-0" />
           ) : isFailed ? (
-            <span className="h-3.5 w-3.5 rounded-full bg-[#F87171] flex items-center justify-center shrink-0"><span className="text-white text-[8px] font-bold">!</span></span>
+            <span className="h-3.5 w-3.5 rounded-full bg-status-error flex items-center justify-center shrink-0">
+              <span className="text-white text-[8px] font-bold">!</span>
+            </span>
           ) : (
-            <AgentIcon size={14} className="text-[#71717A] shrink-0" />
+            <AgentIcon size={14} className="text-theme-tertiary shrink-0" />
           )}
           <div className="min-w-0">
-            <p className="text-[11px] font-medium text-[#F4F4F5] truncate">{currentStepName}</p>
-            <p className="text-[10px] text-[#71717A]">{currentAgent || '—'}</p>
+            <p className="text-[11px] font-medium text-theme truncate">{currentStepName}</p>
+            <p className="text-[10px] text-theme-secondary">{currentAgent || '\u2014'}</p>
           </div>
         </div>
       )}
 
-      {/* Time stats */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="p-2 rounded-[10px] bg-[#0D0F12] border border-white/[0.07]">
+        <div className="p-2 rounded-xl bg-surface-2 border border-theme">
           <div className="flex items-center gap-1 mb-1">
-            <Timer size={10} className="text-[#71717A]" />
-            <span className="text-[9px] text-[#71717A]">Elapsed</span>
+            <Timer size={10} className="text-theme-tertiary" />
+            <span className="text-[9px] text-theme-tertiary">Elapsed</span>
           </div>
-          <p className="text-[11px] font-mono font-semibold text-[#F4F4F5]">{formatTime(elapsed)}</p>
+          <p className="text-[11px] font-mono font-semibold text-theme">{formatTime(elapsed)}</p>
         </div>
-        <div className="p-2 rounded-[10px] bg-[#0D0F12] border border-white/[0.07]">
+        <div className="p-2 rounded-xl bg-surface-2 border border-theme">
           <div className="flex items-center gap-1 mb-1">
-            <Clock size={10} className="text-[#71717A]" />
-            <span className="text-[9px] text-[#71717A]">ETA</span>
+            <Clock size={10} className="text-theme-tertiary" />
+            <span className="text-[9px] text-theme-tertiary">ETA</span>
           </div>
-          <p className="text-[11px] font-mono font-semibold text-[#F4F4F5]">{isExecuting && eta > 0 ? formatTime(eta) : '—'}</p>
+          <p className="text-[11px] font-mono font-semibold text-theme">{isExecuting && eta > 0 ? formatTime(eta) : '\u2014'}</p>
         </div>
       </div>
 
-      {/* Status indicators */}
       <div className="grid grid-cols-3 gap-2">
         <MiniStat
           icon={<Shield size={10} />}
           label="Verify"
-          value={isCompleted ? 'Pass' : isExecuting ? 'Running' : '—'}
+          value={isCompleted ? 'Pass' : isExecuting ? 'Running' : '\u2014'}
           ok={isCompleted || isExecuting}
         />
         <MiniStat
@@ -143,23 +141,21 @@ export function ExecutionPanel({ stateMachineStatus, activeStepIndex, totalSteps
         <MiniStat
           icon={<TrendingUp size={10} />}
           label="Confidence"
-          value={confidence > 0 ? `${confidence}%` : '—'}
+          value={confidence > 0 ? `${confidence}%` : '\u2014'}
           ok={confidence >= 80}
         />
       </div>
 
-      {/* Resource indicators */}
       <div className="grid grid-cols-3 gap-2">
-        <MiniStat icon={<Cpu size={10} />} label="CPU" value="—" ok />
-        <MiniStat icon={<Gauge size={10} />} label="RAM" value="—" ok />
-        <MiniStat icon={<Zap size={10} />} label="Agent" value={currentAgent || '—'} ok />
+        <MiniStat icon={<Cpu size={10} />} label="CPU" value="\u2014" ok />
+        <MiniStat icon={<Gauge size={10} />} label="RAM" value="\u2014" ok />
+        <MiniStat icon={<Zap size={10} />} label="Agent" value={currentAgent || '\u2014'} ok />
       </div>
 
-      {/* Reply button */}
       {(isCompleted || isFailed) && onReply && (
         <button
           onClick={onReply}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-[10px] border border-[#7C3AED]/20 bg-[#7C3AED]/5 hover:bg-[#7C3AED]/10 text-[#7C3AED] text-[11px] font-semibold transition cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-theme-strong bg-surface hover:bg-surface-hover text-theme text-[11px] font-semibold transition cursor-pointer"
         >
           <Reply size={13} />
           Reply with same prompt
@@ -171,10 +167,10 @@ export function ExecutionPanel({ stateMachineStatus, activeStepIndex, totalSteps
 
 function MiniStat({ icon, label, value, ok }: { icon: React.ReactNode; label: string; value: string; ok: boolean }) {
   return (
-    <div className="p-2 rounded-[10px] bg-[#0D0F12] border border-white/[0.07] text-center">
-      <div className={cn('flex items-center justify-center mb-1', ok ? 'text-[#A1A1AA]' : 'text-[#F87171]')}>{icon}</div>
-      <p className="text-[9px] text-[#71717A]">{label}</p>
-      <p className={cn('text-[10px] font-semibold', ok ? 'text-[#F4F4F5]' : 'text-[#F87171]')}>{value}</p>
+    <div className="p-2 rounded-xl bg-surface-2 border border-theme text-center">
+      <div className={cn('flex items-center justify-center mb-1', ok ? 'text-theme-tertiary' : 'text-status-error')}>{icon}</div>
+      <p className="text-[9px] text-theme-tertiary">{label}</p>
+      <p className={cn('text-[10px] font-semibold', ok ? 'text-theme' : 'text-status-error')}>{value}</p>
     </div>
   );
 }

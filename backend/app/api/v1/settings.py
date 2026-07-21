@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -150,12 +150,12 @@ async def update_settings(body: SettingsUpdate, user: User = Depends(get_current
     if db_manager.use_memory:
         for field_name, value in update_data.items():
             s[field_name] = value
-        s["updated_at"] = datetime.utcnow().isoformat()
+        s["updated_at"] = datetime.now(timezone.utc).isoformat()
         await memory_db.update("user_settings", {"user_id": user_id}, s)
     else:
         for field_name, value in update_data.items():
             setattr(s, field_name, value)
-        s.updated_at = datetime.utcnow()
+        s.updated_at = datetime.now(timezone.utc)
         await s.save()
 
     key_hint = await get_api_key_hint(user_id, _get_attr(s, "cloud_provider", "openai"))

@@ -121,3 +121,15 @@ def client():
     from app.main import app
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _patch_file_agent_workspace(request):
+    """Allow FileAgent to operate on any path during tests (bypasses workspace validation).
+    Skip for tests marked with @pytest.mark.real_workspace."""
+    if request.node.get_closest_marker("real_workspace"):
+        yield
+        return
+    from unittest.mock import patch
+    with patch("app.services.agent_dispatcher.FileAgent._validate_workspace", return_value=None):
+        yield

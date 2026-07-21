@@ -160,6 +160,42 @@ async def lifespan(app: FastAPI):
     # 4. Start background directory file indexing crawl loop
     file_indexer.start()
 
+    # 5. Recover stale workflow executions from previous run
+    try:
+        from datetime import datetime, timezone
+        stale_states = ["Planning", "Executing", "Waiting", "Retry", "Stopping"]
+        if db_manager.use_memory:
+            all_execs = await memory_db.find("workflow_executions", {})
+            recovered = 0
+            for ex in all_execs:
+                if ex.get("status") in stale_states:
+                    now = datetime.now(timezone.utc)
+                    await memory_db.update("workflow_executions", {"_id": ex["_id"]}, {
+                        "status": "Cancelled",
+                        "stopped_at": now.isoformat(),
+                        "updated_at": now.isoformat(),
+                        "error_message": "Recovered after backend restart",
+                    })
+                    recovered += 1
+            if recovered:
+                logger.info(f"Startup recovery: marked {recovered} stale execution(s) as Cancelled")
+        else:
+            from app.infrastructure.db.models import WorkflowExecution
+            from bson import ObjectId
+            for st in stale_states:
+                execs = await WorkflowExecution.find(WorkflowExecution.status == st).to_list()
+                for ex in execs:
+                    now = datetime.now(timezone.utc)
+                    ex.status = "Cancelled"
+                    ex.stopped_at = now
+                    ex.updated_at = now
+                    ex.error_message = "Recovered after backend restart"
+                    await ex.save()
+                if execs:
+                    logger.info(f"Startup recovery: marked {len(execs)} stale '{st}' execution(s) as Cancelled")
+    except Exception as e:
+        logger.warning(f"Startup recovery failed (non-critical): {e}")
+
     logger.info("ACO FastAPI startup complete.")
     yield
 
@@ -282,17 +318,21 @@ async def ws_execution_monitor(websocket: WebSocket, execution_id: str):
     # Replay pending permission events (only those owned by this user)
     if _permission_buffer:
         pending_perms = list(_permission_buffer)
-        _permission_buffer.clear()
-        for perm_event in pending_perms:
+        replayed_indices = []
+        for i, perm_event in enumerate(pending_perms):
             if await _check_permission_ownership(
                 SystemEvent(**perm_event) if isinstance(perm_event, dict) else perm_event,
                 str(user.id)
             ):
                 try:
                     await websocket.send_json(perm_event)
+                    replayed_indices.append(i)
                     logger.info(f"Replayed buffered permission event {perm_event.get('payload', {}).get('request_id', '?')} to WebSocket")
                 except Exception:
                     pass
+        # Remove only the replayed events from the buffer (preserving others for different users)
+        for i in reversed(replayed_indices):
+            _permission_buffer.pop(i)
 
     try:
         while True:

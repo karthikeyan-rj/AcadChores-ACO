@@ -34,14 +34,14 @@ export function StepDetails({ step, index, status, onClose }: StepDetailsProps) 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 10 }}
-        className="rounded-[10px] border border-white/[0.07] bg-[#121419] overflow-hidden"
+        className="rounded-xl border border-theme bg-surface overflow-hidden"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
           <div className="flex items-center gap-2">
-            <AgentIcon size={14} className="text-[#7C3AED]" />
-            <span className="text-xs font-semibold text-[#F4F4F5]">Step {index + 1} Details</span>
+            <AgentIcon size={14} className="text-theme-secondary" />
+            <span className="text-xs font-semibold text-theme">Step {index + 1} Details</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-white/5 transition cursor-pointer text-[#71717A] hover:text-[#F4F4F5]">
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-surface-hover transition cursor-pointer text-theme-tertiary hover:text-theme">
             <X size={14} />
           </button>
         </div>
@@ -59,10 +59,10 @@ export function StepDetails({ step, index, status, onClose }: StepDetailsProps) 
 function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="flex items-center gap-1.5 text-[11px] text-[#71717A]">
+      <span className="flex items-center gap-1.5 text-[11px] text-theme-tertiary">
         {icon} {label}
       </span>
-      <span className="text-[11px] text-[#F4F4F5] font-medium">{value}</span>
+      <span className="text-[11px] text-theme font-medium">{value}</span>
     </div>
   );
 }

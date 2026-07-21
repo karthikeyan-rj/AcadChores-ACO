@@ -6,6 +6,7 @@ import sys
 import asyncio
 from dataclasses import dataclass
 from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
 from pydantic import BaseModel
 from langgraph.graph import StateGraph, END
 
@@ -80,6 +81,16 @@ class PlannerState(BaseModel):
 
 
 _METADATA_CACHE: Dict[str, Dict[str, Any]] = {}
+_METADATA_CACHE_MAX = 1000
+
+
+def _cache_evict_if_needed():
+    """Evict oldest entries when cache exceeds max size."""
+    if len(_METADATA_CACHE) > _METADATA_CACHE_MAX:
+        # Remove the oldest half of entries
+        keys = list(_METADATA_CACHE.keys())
+        for k in keys[:len(keys) // 2]:
+            _METADATA_CACHE.pop(k, None)
 
 
 async def _extract_prompt_metadata(prompt: str) -> Dict[str, Any]:
@@ -146,12 +157,14 @@ Rules:
                 "is_code": bool(result.get("is_code")),
                 "is_destructive": bool(result.get("is_destructive")),
             }
+            _cache_evict_if_needed()
             _METADATA_CACHE[cache_key] = metadata
             logger.info(f"Extracted prompt metadata: {metadata}")
             return metadata
     except (asyncio.TimeoutError, json.JSONDecodeError, Exception) as e:
         logger.warning(f"Metadata extraction failed ({type(e).__name__}), using defaults")
 
+    _cache_evict_if_needed()
     _METADATA_CACHE[cache_key] = defaults
     return defaults
 
@@ -400,8 +413,10 @@ class PlannerService:
                     logger.warning(f"Cloud fallback daily limit reached ({daily_limit}) for user {user_id}")
                 else:
                     await self._try_cloud_fallback(prompt, user_id, metadata, best_steps, best_validation, min_quality, user_cloud_provider, user_cloud_model)
+            elif not user_id:
+                logger.warning("Cloud fallback skipped: no user_id provided (daily limit cannot be enforced)")
             else:
-                await self._try_cloud_fallback(prompt, user_id, metadata, best_steps, best_validation, min_quality, user_cloud_provider, user_cloud_model)
+                logger.info("Cloud fallback skipped: daily limit is 0 (disabled)")
 
         # --- Phase 2.5: Ensure metadata reflects best score found ---
         if best_validation.get("score", 0) > metadata.get("quality_score", 0):
@@ -1405,7 +1420,7 @@ class PlannerService:
                     base_name = base_match.group(1) if base_match else "output"
                     lang_def = LanguageDetector.detect(prompt)
                     ext = lang_def.extension
-                    ts = __import__('datetime').datetime.now().strftime("%Y%m%d_%H%M%S")
+                    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
                     filename = f"{base_name}_{ts}{ext}"
 
         if not target_path:
@@ -1823,7 +1838,7 @@ class PlannerService:
                         base_name = "aco_output"
                     lang_def = LanguageDetector.detect(prompt)
                     ext = lang_def.extension
-                    ts = __import__('datetime').datetime.now().strftime("%Y%m%d_%H%M%S")
+                    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
                     filename = f"{base_name}_{ts}{ext}"
 
             # For code requests, use LLM to generate real code content

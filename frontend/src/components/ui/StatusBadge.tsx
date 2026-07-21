@@ -19,7 +19,7 @@ export function StatusBadge({ status, size = 'sm', showDot = true, className }: 
 
   return (
     <span className={cn(
-      'inline-flex items-center gap-1.5 rounded-full border font-semibold uppercase tracking-wider',
+      'inline-flex items-center gap-1.5 rounded-md border font-semibold uppercase tracking-wider',
       statusBg(status),
       statusColor(status),
       sizeClasses[size],

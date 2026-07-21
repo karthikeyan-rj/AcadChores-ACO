@@ -2,7 +2,7 @@ import json
 import logging
 from enum import Enum
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from bson import ObjectId
 from app.core.database import db_manager
@@ -112,7 +112,7 @@ class WorkflowStateMachine:
 
         state_data = {
             "state": new_state.value,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "metadata": metadata or {}
         }
 
@@ -132,17 +132,25 @@ class WorkflowStateMachine:
             if error_message:
                 update["error_message"] = error_message
             if new_state in [WorkflowState.COMPLETED, WorkflowState.FAILED, WorkflowState.CANCELLED]:
-                update["completed_at"] = datetime.utcnow().isoformat()
+                update["completed_at"] = datetime.now(timezone.utc).isoformat()
+            if new_state == WorkflowState.CANCELLED:
+                update["stopped_at"] = datetime.now(timezone.utc).isoformat()
+            if new_state == WorkflowState.FAILED:
+                update["result_type"] = "failed"
             await memory_db.update("workflow_executions", {"_id": ObjectId(execution_id)}, update)
         else:
             execution = await WorkflowExecution.get(execution_id)
             if execution:
                 execution.status = new_state.value
-                execution.updated_at = datetime.utcnow()
+                execution.updated_at = datetime.now(timezone.utc)
                 if error_message:
                     execution.error_message = error_message
                 if new_state in [WorkflowState.COMPLETED, WorkflowState.FAILED, WorkflowState.CANCELLED]:
-                    execution.completed_at = datetime.utcnow()
+                    execution.completed_at = datetime.now(timezone.utc)
+                if new_state == WorkflowState.CANCELLED:
+                    execution.stopped_at = datetime.now(timezone.utc)
+                if new_state == WorkflowState.FAILED:
+                    execution.result_type = "failed"
                 await execution.save()
 
         # 3. Publish update event to Event Bus

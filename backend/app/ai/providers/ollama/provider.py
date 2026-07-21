@@ -42,13 +42,13 @@ class OllamaProvider(LLMProvider):
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(
             supports_streaming=True,
-            supports_json=True,
-            supports_vision=False,
             supports_embeddings=True,
-            supports_function_calling=True,
-            supports_images=False,
+            supports_model_discovery=True,
+            supports_structured_output=True,
+            supports_reasoning=False,
             supports_system_prompt=True,
             supports_tools=True,
+            supports_vision=False,
         )
 
     @property

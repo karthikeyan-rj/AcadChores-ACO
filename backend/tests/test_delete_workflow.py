@@ -118,6 +118,7 @@ class TestDeleteWorkflow:
             await file_agent.execute("delete", {"path": malicious}, _noop_progress)
 
     @pytest.mark.asyncio
+    @pytest.mark.real_workspace
     async def test_09_reject_path_outside_allowed_roots(self, file_agent, tmp_workspace):
         """Test 9: Reject a path outside allowed roots (blocked system directory)."""
         with pytest.raises(PermissionError):

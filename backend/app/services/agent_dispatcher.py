@@ -1064,6 +1064,9 @@ class FileAgent(BaseAgent):
                 path = self._resolve_path(path)
             else:
                 raise ValueError("write action requires either 'path' or 'filename' parameter")
+            sys_blocked = _is_path_blocked(path, "write")
+            if sys_blocked:
+                raise PermissionError(f"blocked system directory: {sys_blocked}")
             block = self._validate_workspace(path)
             if block:
                 raise PermissionError(block)
@@ -1077,6 +1080,9 @@ class FileAgent(BaseAgent):
 
         elif action == "delete":
             path = self._resolve_path(params.get("path", ""))
+            sys_blocked = _is_path_blocked(path, "delete")
+            if sys_blocked:
+                raise PermissionError(f"blocked system directory: {sys_blocked}")
             block = self._validate_workspace(path)
             if block:
                 raise PermissionError(block)
@@ -1166,6 +1172,9 @@ class FileAgent(BaseAgent):
 
         elif action == "create_directory":
             path = self._resolve_path(params.get("path", ""))
+            sys_blocked = _is_path_blocked(path, "create_directory")
+            if sys_blocked:
+                raise PermissionError(f"blocked system directory: {sys_blocked}")
             block = self._validate_workspace(path)
             if block:
                 raise PermissionError(block)
@@ -1182,6 +1191,12 @@ class FileAgent(BaseAgent):
             source = self._resolve_path(params.get("source", ""))
             dest = self._resolve_path(params.get("destination", ""))
             create_parent = params.get("create_parent", True)
+            sys_blocked_s = _is_path_blocked(source, "move")
+            if sys_blocked_s:
+                raise PermissionError(f"blocked system directory: {sys_blocked_s}")
+            sys_blocked_d = _is_path_blocked(dest, "move")
+            if sys_blocked_d:
+                raise PermissionError(f"blocked system directory: {sys_blocked_d}")
             block_s = self._validate_workspace(source)
             if block_s:
                 raise PermissionError(f"Source: {block_s}")
@@ -1210,6 +1225,9 @@ class FileAgent(BaseAgent):
             new_name = params.get("new_name", "").strip()
             if not new_name:
                 raise ValueError("rename requires 'new_name' parameter")
+            sys_blocked = _is_path_blocked(path, "rename")
+            if sys_blocked:
+                raise PermissionError(f"blocked system directory: {sys_blocked}")
             block = self._validate_workspace(path)
             if block:
                 raise PermissionError(block)
@@ -1227,6 +1245,12 @@ class FileAgent(BaseAgent):
             source = self._resolve_path(params.get("source", ""))
             dest = self._resolve_path(params.get("destination", ""))
             create_parent = params.get("create_parent", True)
+            sys_blocked_s = _is_path_blocked(source, "copy")
+            if sys_blocked_s:
+                raise PermissionError(f"blocked system directory: {sys_blocked_s}")
+            sys_blocked_d = _is_path_blocked(dest, "copy")
+            if sys_blocked_d:
+                raise PermissionError(f"blocked system directory: {sys_blocked_d}")
             block_s = self._validate_workspace(source)
             if block_s:
                 raise PermissionError(f"Source: {block_s}")
@@ -1318,6 +1342,28 @@ class FileAgent(BaseAgent):
 
         await progress_cb(100, f"File action '{action}' completed successfully.")
         return result
+
+    def _match_file(self, filename: str, match_type: str, keyword: str, case_sensitive: bool = True) -> bool:
+        """Check if a filename matches the given criteria."""
+        if not case_sensitive:
+            filename_cmp = filename.lower()
+            keyword_cmp = keyword.lower()
+        else:
+            filename_cmp = filename
+            keyword_cmp = keyword
+
+        if match_type == "filename_contains":
+            return keyword_cmp in filename_cmp
+        elif match_type == "filename_starts_with":
+            return filename_cmp.startswith(keyword_cmp)
+        elif match_type == "filename_ends_with":
+            return filename_cmp.endswith(keyword_cmp)
+        elif match_type == "extension":
+            ext = keyword_cmp.lstrip(".")
+            return filename_cmp.endswith(f".{ext}")
+        elif match_type == "exact_filename":
+            return filename_cmp == keyword_cmp
+        return False
 
 
 

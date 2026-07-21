@@ -3,8 +3,11 @@ from typing import List, Dict, Any, Optional
 from bson import ObjectId
 from pydantic import BaseModel
 from beanie import PydanticObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import db_manager
 from app.core.config import settings
@@ -32,7 +35,7 @@ async def _save_chat_message(user_id, conversation_id: str, role: str, message_t
         "workflow_id": workflow_id,
         "execution_id": execution_id,
         "metadata": metadata or {},
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     if db_manager.use_memory:
         oid = await memory_db.insert("chat_messages", msg)
@@ -136,6 +139,7 @@ class CreateWorkflowRequest(BaseModel):
 
 class PlanGenerationRequest(BaseModel):
     prompt: str
+    conversation_id: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
@@ -171,7 +175,23 @@ async def _get_active_execution(user_id) -> Optional[dict]:
     if db_manager.use_memory:
         all_execs = await memory_db.find("workflow_executions", {"user_id": str(user_id)})
         active = [d for d in all_execs if d.get("status") in ACTIVE_STATES]
-        return active[0] if active else None
+        if not active:
+            return None
+        d = active[0]
+        return {
+            "_id": d.get("_id"),
+            "workflow_id": d.get("workflow_id"),
+            "conversation_id": d.get("conversation_id"),
+            "title": d.get("title", ""),
+            "description": d.get("description", ""),
+            "steps": d.get("steps", []),
+            "status": d.get("status"),
+            "current_step_index": d.get("current_step_index", 0),
+            "total_steps": d.get("total_steps", 0),
+            "started_at": d.get("started_at"),
+            "last_completed_step": d.get("last_completed_step"),
+            "partial_result": d.get("partial_result"),
+        }
     else:
         from app.infrastructure.db.models import WorkflowExecution
         active = await WorkflowExecution.find(
@@ -183,12 +203,16 @@ async def _get_active_execution(user_id) -> Optional[dict]:
         return {
             "_id": str(active.id),
             "workflow_id": str(active.workflow_id),
+            "conversation_id": active.conversation_id,
             "title": active.title or "",
             "description": active.description or "",
+            "steps": active.steps or [],
             "status": active.status,
             "current_step_index": active.current_step_index,
             "total_steps": active.total_steps,
             "started_at": active.started_at.isoformat() if active.started_at else None,
+            "last_completed_step": active.last_completed_step,
+            "partial_result": active.partial_result,
         }
 
 
@@ -225,7 +249,7 @@ async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_c
             "description": req.description,
             "owner_id": str(user.id),
             "steps": steps_dicts,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         oid = await memory_db.insert("workflows", doc)
         return {"_id": str(oid), "title": req.title, "steps": steps_dicts}
@@ -243,7 +267,21 @@ async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_c
 @limiter.limit(settings.RATE_LIMIT_AI)
 async def generate_plan(request: Request, req: PlanGenerationRequest, user: User = Depends(get_current_user)):
     try:
-        result = await planner_service.generate_workflow_steps(req.prompt, user_id=str(user.id))
+        prompt = req.prompt
+
+        # Load conversation context for reference resolution (same as /chat endpoint)
+        conversation_id = req.conversation_id or "default"
+        recent_messages = await _get_conversation_messages(user.id, conversation_id, limit=20)
+        entities = build_entity_context(recent_messages)
+
+        # Resolve ambiguous references (e.g., "delete that file" → "delete C:\...\factorial.py")
+        resolved_prompt = resolve_references(prompt, entities)
+
+        # If prompt was resolved, use the resolved version for the planner
+        if resolved_prompt != prompt:
+            logger.info(f"generate-plan: resolved '{prompt}' → '{resolved_prompt}'")
+
+        result = await planner_service.generate_workflow_steps(resolved_prompt, user_id=str(user.id))
         return {"success": True, **result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -267,8 +305,8 @@ async def chat(request: Request, req: ChatRequest, user: User = Depends(get_curr
     # Resolve ambiguous references (e.g., "delete that file" → "delete C:\...\factorial.py")
     resolved_prompt = resolve_references(req.message, entities)
 
-    # Check if reference points to a deleted file
-    clarification = check_reference_validity(resolved_prompt, entities)
+    # Check if reference points to a deleted file (use original prompt for substring matching)
+    clarification = check_reference_validity(req.message, entities)
     if clarification:
         await _save_chat_message(user_id, conversation_id, "assistant", "assistant", clarification)
         return {
@@ -318,6 +356,15 @@ async def chat(request: Request, req: ChatRequest, user: User = Depends(get_curr
         await _save_chat_message(user_id, conversation_id, "assistant", "assistant", clarification)
         return {
             "success": True, "reply": clarification,
+            "conversation_id": conversation_id,
+            "intent": intent,
+        }
+
+    if intent_type == "unsupported":
+        reply_text = "I'm not sure how to help with that. Could you rephrase your request? You can ask me to open apps, manage files, browse the web, run terminal commands, or just chat."
+        await _save_chat_message(user_id, conversation_id, "assistant", "assistant", reply_text)
+        return {
+            "success": True, "reply": reply_text,
             "conversation_id": conversation_id,
             "intent": intent,
         }
@@ -381,10 +428,75 @@ async def get_conversation(conversation_id: str, user: User = Depends(get_curren
     return {"success": True, "conversation_id": conversation_id, "messages": messages}
 
 
+@router.get("/conversations/{conversation_id}/workflows")
+async def get_conversation_workflows(conversation_id: str, user: User = Depends(get_current_user)):
+    """Return all workflow executions linked to a conversation."""
+    if db_manager.use_memory:
+        all_execs = await memory_db.find("workflow_executions", {"user_id": str(user.id), "conversation_id": conversation_id})
+        all_execs.sort(key=lambda e: e.get("started_at", ""))
+        workflows = []
+        for d in all_execs:
+            workflows.append({
+                "_id": d.get("_id"),
+                "workflow_id": d.get("workflow_id"),
+                "conversation_id": d.get("conversation_id"),
+                "title": d.get("title", ""),
+                "description": d.get("description", ""),
+                "steps": d.get("steps", []),
+                "status": d.get("status"),
+                "current_step_index": d.get("current_step_index", 0),
+                "total_steps": d.get("total_steps", 0),
+                "started_at": d.get("started_at"),
+                "completed_at": d.get("completed_at"),
+                "stopped_at": d.get("stopped_at"),
+                "error_message": d.get("error_message"),
+                "result": d.get("result"),
+                "result_type": d.get("result_type"),
+                "last_completed_step": d.get("last_completed_step"),
+                "partial_result": d.get("partial_result"),
+            })
+        return {"success": True, "workflows": workflows}
+    else:
+        from app.infrastructure.db.models import WorkflowExecution
+        execs = await WorkflowExecution.find(
+            WorkflowExecution.user_id == user.id,
+            WorkflowExecution.conversation_id == conversation_id,
+        ).sort(WorkflowExecution.started_at).to_list()
+        workflows = []
+        for e in execs:
+            workflows.append({
+                "_id": str(e.id),
+                "workflow_id": str(e.workflow_id),
+                "conversation_id": e.conversation_id,
+                "title": e.title or "",
+                "description": e.description or "",
+                "steps": e.steps or [],
+                "status": e.status,
+                "current_step_index": e.current_step_index,
+                "total_steps": e.total_steps,
+                "started_at": e.started_at.isoformat() if e.started_at else None,
+                "completed_at": e.completed_at.isoformat() if e.completed_at else None,
+                "stopped_at": e.stopped_at.isoformat() if e.stopped_at else None,
+                "error_message": e.error_message,
+                "result": e.result,
+                "result_type": e.result_type,
+                "last_completed_step": e.last_completed_step,
+                "partial_result": e.partial_result,
+            })
+        return {"success": True, "workflows": workflows}
+
+
 @router.post("/{id}/execute")
-async def execute_workflow(id: str, user: User = Depends(get_current_user)):
+async def execute_workflow(id: str, request: Request, user: User = Depends(get_current_user)):
     if not ObjectId.is_valid(id):
         raise HTTPException(status_code=400, detail="Invalid workflow ID format")
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    conversation_id = body.get("conversation_id")
 
     # Enforce single active workflow per user
     try:
@@ -408,7 +520,7 @@ async def execute_workflow(id: str, user: User = Depends(get_current_user)):
         workflow_obj = WF(title=doc["title"], description=doc.get("description", ""), owner_id=user.id, steps=steps_obj)
         workflow_obj.id = ObjectId(id)
         try:
-            execution_id = await workflow_engine.start_execution(workflow_obj, user.id)
+            execution_id = await workflow_engine.start_execution(workflow_obj, user.id, conversation_id=conversation_id)
             return {"success": True, "execution_id": execution_id}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -419,7 +531,7 @@ async def execute_workflow(id: str, user: User = Depends(get_current_user)):
     if str(workflow.owner_id) != str(user.id):
         raise HTTPException(status_code=403, detail="Access denied")
     try:
-        execution_id = await workflow_engine.start_execution(workflow.id, user.id)
+        execution_id = await workflow_engine.start_execution(workflow.id, user.id, conversation_id=conversation_id)
         return {"success": True, "execution_id": execution_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

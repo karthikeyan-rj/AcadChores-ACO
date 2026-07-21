@@ -11,7 +11,7 @@ from app.ai.providers.base.provider import LLMProvider
 logger = logging.getLogger(__name__)
 
 PROVIDERS_PACKAGE = "app.ai.providers"
-SKIP_MODULES = {"base", "__pycache__"}
+SKIP_MODULES = {"base", "openai_compatible", "__pycache__"}
 
 
 class ProviderRegistry:

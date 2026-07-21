@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
@@ -58,14 +58,14 @@ function FadeIn({ children, className = '', delay = 0 }: { children: React.React
 function SectionHeading({ label, title, desc }: { label: string; title: string; desc?: string }) {
   return (
     <FadeIn className="text-center mb-16">
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-[#7C3AED] mb-3">{label}</p>
-      <h2 className="text-3xl md:text-5xl font-bold text-[#F4F4F5]">{title}</h2>
-      {desc && <p className="mt-4 text-[#71717A] max-w-lg mx-auto text-sm">{desc}</p>}
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-theme-tertiary mb-3">{label}</p>
+      <h2 className="text-3xl md:text-5xl font-bold text-theme">{title}</h2>
+      {desc && <p className="mt-4 text-theme-tertiary max-w-lg mx-auto text-sm">{desc}</p>}
     </FadeIn>
   );
 }
 
-/* ─── NAVBAR ─── */
+/* --- NAVBAR --- */
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -88,20 +88,20 @@ function Navbar() {
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.3 }}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-[#08090B]/80 backdrop-blur-xl border-b border-white/[0.07]' : 'bg-transparent'
+        scrolled ? 'bg-app/80 border-b border-theme' : 'bg-transparent'
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <a href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#7C3AED]/10 flex items-center justify-center">
-            <Cpu size={16} className="text-[#7C3AED]" />
+          <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center">
+            <Cpu size={16} className="text-theme" />
           </div>
-          <span className="font-bold text-base text-[#F4F4F5]">ACO</span>
+          <span className="font-bold text-base text-theme">ACO</span>
         </a>
 
         <nav className="hidden md:flex items-center gap-8">
           {links.map(l => (
-            <a key={l.href} href={l.href} className="text-[13px] text-[#71717A] hover:text-[#F4F4F5] transition-colors duration-200">
+            <a key={l.href} href={l.href} className="text-[13px] text-theme-tertiary hover:text-theme transition-colors duration-200">
               {l.label}
             </a>
           ))}
@@ -109,16 +109,16 @@ function Navbar() {
 
         <div className="hidden md:flex items-center gap-3">
           <a href="/login"
-            className="text-[13px] text-[#71717A] hover:text-[#F4F4F5] transition-colors px-3 py-1.5">
+            className="text-[13px] text-theme-tertiary hover:text-theme transition-colors px-3 py-1.5">
             Sign In
           </a>
           <a href="/login"
-            className="text-[13px] font-medium bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-4 py-1.5 rounded-lg transition-all duration-200">
+            className="text-[13px] font-medium bg-text-primary text-text-inverse hover:opacity-90 px-4 py-1.5 rounded-lg transition-all duration-200">
             Get Started
           </a>
         </div>
 
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden text-[#71717A] hover:text-[#F4F4F5]">
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden text-theme-tertiary hover:text-theme">
           {mobileOpen ? <XIcon size={20} /> : <Menu size={20} />}
         </button>
       </div>
@@ -129,18 +129,18 @@ function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-[#08090B]/95 backdrop-blur-xl border-b border-white/[0.07] overflow-hidden"
+            className="md:hidden bg-app/95 border-b border-theme overflow-hidden"
           >
             <div className="px-6 py-4 space-y-3">
               {links.map(l => (
                 <a key={l.href} href={l.href} onClick={() => setMobileOpen(false)}
-                  className="block text-sm text-[#71717A] hover:text-[#F4F4F5] transition-colors py-2">
+                  className="block text-sm text-theme-tertiary hover:text-theme transition-colors py-2">
                   {l.label}
                 </a>
               ))}
-              <div className="pt-3 border-t border-white/[0.07] flex flex-col gap-2">
-                <a href="/login" className="text-sm text-[#71717A] hover:text-[#F4F4F5] py-2">Sign In</a>
-                <a href="/login" className="text-sm font-medium bg-[#7C3AED] text-white px-4 py-2.5 rounded-lg text-center">Get Started</a>
+              <div className="pt-3 border-t border-theme flex flex-col gap-2">
+                <a href="/login" className="text-sm text-theme-tertiary hover:text-theme py-2">Sign In</a>
+                <a href="/login" className="text-sm font-medium bg-text-primary text-text-inverse px-4 py-2.5 rounded-lg text-center">Get Started</a>
               </div>
             </div>
           </motion.div>
@@ -150,15 +150,10 @@ function Navbar() {
   );
 }
 
-/* ─── HERO ─── */
+/* --- HERO --- */
 function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center pt-24 pb-20 px-6 overflow-hidden bg-[#08090B]">
-      {/* Subtle organic background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#7C3AED]/[0.03] blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-[#7C3AED]/[0.02] blur-[100px]" />
-      </div>
+    <section className="relative min-h-screen flex flex-col items-center justify-center pt-24 pb-20 px-6 overflow-hidden bg-app">
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -170,17 +165,17 @@ function Hero() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/[0.07] bg-[#121419]/50 mb-8"
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-theme bg-surface/50 mb-8"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-[#ADFF2F]" />
-          <span className="text-[11px] font-medium text-[#A1A1AA]">v1.0 — Now Available</span>
+          <span className="h-1.5 w-1.5 rounded-full bg-status-active" />
+          <span className="text-[11px] font-medium text-theme-secondary">v1.0 -- Now Available</span>
         </motion.div>
 
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-[#F4F4F5] leading-[1.05]"
+          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-theme leading-[1.05]"
         >
           Autonomous
           <br />
@@ -191,10 +186,10 @@ function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="mt-6 text-base md:text-lg text-[#71717A] max-w-2xl mx-auto leading-relaxed"
+          className="mt-6 text-base md:text-lg text-theme-tertiary max-w-2xl mx-auto leading-relaxed"
         >
           An autonomous AI agent that understands goals, plans workflows, and operates your computer securely.
-          Browse websites, automate tasks, manage files, and execute commands — all from natural language.
+          Browse websites, automate tasks, manage files, and execute commands -- all from natural language.
         </motion.p>
 
         <motion.div
@@ -204,11 +199,11 @@ function Hero() {
           className="mt-10 flex flex-wrap items-center justify-center gap-4"
         >
           <a href="/login"
-            className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
+            className="flex items-center gap-2 bg-text-primary hover:opacity-90 text-text-inverse px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
             Get Started <ArrowRight size={16} />
           </a>
           <a href="#features"
-            className="flex items-center gap-2 bg-[#121419] hover:bg-[#181B21] text-[#F4F4F5] px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 border border-white/[0.07] hover:border-white/[0.12]">
+            className="flex items-center gap-2 bg-surface hover:bg-surface-hover text-theme px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 border border-theme hover:border-theme-strong">
             Learn More
           </a>
         </motion.div>
@@ -220,34 +215,34 @@ function Hero() {
           transition={{ delay: 0.5 }}
           className="mt-16 max-w-xl mx-auto"
         >
-          <div className="rounded-2xl border border-white/[0.07] bg-[#121419] overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.07]">
+          <div className="rounded-2xl border border-theme bg-surface overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-theme">
               <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#71717A]" />
-                <div className="w-2.5 h-2.5 rounded-full bg-[#71717A]" />
-                <div className="w-2.5 h-2.5 rounded-full bg-[#71717A]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-theme-tertiary" />
+                <div className="w-2.5 h-2.5 rounded-full bg-theme-tertiary" />
+                <div className="w-2.5 h-2.5 rounded-full bg-theme-tertiary" />
               </div>
-              <span className="text-[10px] text-[#71717A] ml-2 font-mono">ACO Terminal</span>
+              <span className="text-[10px] text-theme-tertiary ml-2 font-mono">ACO Terminal</span>
             </div>
             <div className="p-5 font-mono text-sm">
-              <div className="flex items-center gap-2 text-[#71717A] mb-3">
-                <Sparkles size={12} className="text-[#7C3AED]" />
+              <div className="flex items-center gap-2 text-theme-tertiary mb-3">
+                <Sparkles size={12} className="text-theme-tertiary" />
                 <span className="text-[11px]">Tell ACO what to do...</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[#7C3AED]">$</span>
-                <span className="text-[#F4F4F5]">Summarize today's AI news</span>
+                <span className="text-theme-tertiary">$</span>
+                <span className="text-theme">Summarize today's AI news</span>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[#A1A1AA] text-[10px]">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-2 border border-theme text-theme-secondary text-[10px]">
                   <Globe size={10} />
                   Browse web
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[#A1A1AA] text-[10px]">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-2 border border-theme text-theme-secondary text-[10px]">
                   <MailIcon size={10} />
                   Send email
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[#A1A1AA] text-[10px]">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-2 border border-theme text-theme-secondary text-[10px]">
                   <FileText size={10} />
                   Organize files
                 </div>
@@ -272,9 +267,9 @@ function Hero() {
           ].map((a) => (
             <div
               key={a.label}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/[0.07] bg-[#121419]/50 text-[11px] text-[#A1A1AA]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-theme bg-surface/50 text-[11px] text-theme-secondary"
             >
-              <a.icon size={12} className="text-[#A1A1AA]" />
+              <a.icon size={12} className="text-theme-secondary" />
               {a.label}
             </div>
           ))}
@@ -286,14 +281,14 @@ function Hero() {
 
 function MailIcon({ size }: { size: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#A1A1AA]">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-theme-secondary">
       <rect width="20" height="16" x="2" y="4" rx="2" />
       <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
     </svg>
   );
 }
 
-/* ─── FEATURES ─── */
+/* --- FEATURES --- */
 function Features() {
   const features = [
     { icon: Globe, title: 'Browser Automation', desc: 'Navigate, click, fill forms, scrape content. Full Playwright-powered browser control.' },
@@ -326,13 +321,13 @@ function Features() {
               <motion.div
                 key={i}
                 variants={fadeUp}
-                className="p-5 rounded-2xl border border-white/[0.07] bg-[#121419] hover:bg-[#181B21] hover:border-white/[0.12] transition-all duration-200"
+                className="p-5 rounded-2xl border border-theme bg-surface hover:bg-surface-hover hover:border-theme-strong transition-all duration-200"
               >
-                <div className="w-10 h-10 rounded-xl bg-[#181B21] border border-white/[0.07] flex items-center justify-center mb-4">
-                  <Icon size={18} className="text-[#A1A1AA]" />
+                <div className="w-10 h-10 rounded-xl bg-surface-hover border border-theme flex items-center justify-center mb-4">
+                  <Icon size={18} className="text-theme-secondary" />
                 </div>
-                <h3 className="text-sm font-semibold text-[#F4F4F5] mb-1.5">{f.title}</h3>
-                <p className="text-[12px] text-[#71717A] leading-relaxed">{f.desc}</p>
+                <h3 className="text-sm font-semibold text-theme mb-1.5">{f.title}</h3>
+                <p className="text-[12px] text-theme-tertiary leading-relaxed">{f.desc}</p>
               </motion.div>
             );
           })}
@@ -342,7 +337,7 @@ function Features() {
   );
 }
 
-/* ─── HOW IT WORKS ─── */
+/* --- HOW IT WORKS --- */
 function HowItWorks() {
   const steps = [
     { num: '01', title: 'Describe your task', desc: 'Tell ACO what you want in natural language.', icon: MessageSquare },
@@ -354,12 +349,12 @@ function HowItWorks() {
   ];
 
   return (
-    <Section className="py-32 px-6 bg-[#0D0F12]">
+    <Section className="py-32 px-6 bg-app">
       <div className="max-w-3xl mx-auto">
         <SectionHeading label="How It Works" title="From intent to execution" />
 
         <div className="relative">
-          <div className="absolute left-[19px] top-8 bottom-8 w-px bg-white/[0.07]" />
+          <div className="absolute left-[19px] top-8 bottom-8 w-px bg-theme" />
 
           <div className="space-y-1">
             {steps.map((s, i) => {
@@ -373,15 +368,15 @@ function HowItWorks() {
                   transition={{ delay: i * 0.08 }}
                   className="flex items-start gap-5 py-4 group"
                 >
-                  <div className="relative z-10 w-10 h-10 rounded-xl bg-[#121419] border border-white/[0.07] flex items-center justify-center shrink-0 group-hover:border-white/[0.12] transition-colors">
-                    <Icon size={16} className="text-[#A1A1AA]" />
+                  <div className="relative z-10 w-10 h-10 rounded-xl bg-surface border border-theme flex items-center justify-center shrink-0 group-hover:border-theme-strong transition-colors">
+                    <Icon size={16} className="text-theme-secondary" />
                   </div>
                   <div className="pt-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <span className="text-[10px] font-mono text-[#71717A]">{s.num}</span>
-                      <h3 className="text-sm font-semibold text-[#F4F4F5]">{s.title}</h3>
+                      <span className="text-[10px] font-mono text-theme-tertiary">{s.num}</span>
+                      <h3 className="text-sm font-semibold text-theme">{s.title}</h3>
                     </div>
-                    <p className="text-[13px] text-[#71717A]">{s.desc}</p>
+                    <p className="text-[13px] text-theme-tertiary">{s.desc}</p>
                   </div>
                 </motion.div>
               );
@@ -393,7 +388,7 @@ function HowItWorks() {
   );
 }
 
-/* ─── ARCHITECTURE ─── */
+/* --- ARCHITECTURE --- */
 function Architecture() {
   const layers = [
     { label: 'Frontend', sub: 'Next.js + TypeScript', icon: Code2 },
@@ -423,7 +418,7 @@ function Architecture() {
         <SectionHeading label="Architecture" title="Built for reliability" desc="A layered architecture designed for extensibility, fault tolerance, and performance." />
 
         <FadeIn>
-          <div className="relative p-8 rounded-3xl border border-white/[0.07] bg-[#121419]">
+          <div className="relative p-8 rounded-3xl border border-theme bg-surface">
             <div className="space-y-3">
               {layers.map((l, i) => {
                 const Icon = l.icon;
@@ -434,17 +429,17 @@ function Architecture() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.08 }}
-                    className="flex items-center gap-4 px-5 py-3 rounded-xl border border-white/[0.07] bg-[#0D0F12] hover:border-white/[0.12] transition-colors"
+                    className="flex items-center gap-4 px-5 py-3 rounded-xl border border-theme bg-app hover:border-theme-strong transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-[#181B21] flex items-center justify-center text-[#A1A1AA]">
+                    <div className="w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center text-theme-secondary">
                       <Icon size={16} />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-[#F4F4F5]">{l.label}</p>
-                      <p className="text-[11px] text-[#71717A]">{l.sub}</p>
+                      <p className="text-sm font-medium text-theme">{l.label}</p>
+                      <p className="text-[11px] text-theme-tertiary">{l.sub}</p>
                     </div>
                     {i < layers.length - 1 && (
-                      <ChevronDown size={14} className="text-[#71717A]" />
+                      <ChevronDown size={14} className="text-theme-tertiary" />
                     )}
                   </motion.div>
                 );
@@ -452,9 +447,9 @@ function Architecture() {
             </div>
 
             <div className="mt-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/[0.07]" />
-              <span className="text-[10px] font-medium text-[#71717A] uppercase tracking-wider shrink-0">Agent Pool</span>
-              <div className="h-px flex-1 bg-white/[0.07]" />
+              <div className="h-px flex-1 bg-theme" />
+              <span className="text-[10px] font-medium text-theme-tertiary uppercase tracking-wider shrink-0">Agent Pool</span>
+              <div className="h-px flex-1 bg-theme" />
             </div>
 
             <div className="mt-4 grid grid-cols-5 gap-3">
@@ -463,29 +458,29 @@ function Architecture() {
                 return (
                   <motion.div
                     key={i}
-                    className="flex flex-col items-center gap-2 p-3 rounded-xl border border-white/[0.07] bg-[#0D0F12] hover:border-white/[0.12] hover:bg-[#181B21] transition-all"
+                    className="flex flex-col items-center gap-2 p-3 rounded-xl border border-theme bg-app hover:border-theme-strong hover:bg-surface-hover transition-all"
                   >
-                    <Icon size={18} className="text-[#A1A1AA]" />
-                    <span className="text-[11px] text-[#71717A]">{a.label}</span>
+                    <Icon size={18} className="text-theme-secondary" />
+                    <span className="text-[11px] text-theme-tertiary">{a.label}</span>
                   </motion.div>
                 );
               })}
             </div>
 
             <div className="mt-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/[0.07]" />
-              <span className="text-[10px] font-medium text-[#71717A] uppercase tracking-wider shrink-0">Post-Processing</span>
-              <div className="h-px flex-1 bg-white/[0.07]" />
+              <div className="h-px flex-1 bg-theme" />
+              <span className="text-[10px] font-medium text-theme-tertiary uppercase tracking-wider shrink-0">Post-Processing</span>
+              <div className="h-px flex-1 bg-theme" />
             </div>
 
             <div className="mt-4 space-y-2">
               {postSteps.map((s, i) => {
                 const Icon = s.icon;
                 return (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-white/[0.07] bg-[#0D0F12]">
-                    <Icon size={14} className="text-[#A1A1AA]" />
-                    <span className="text-xs font-medium text-[#F4F4F5]">{s.label}</span>
-                    {i < postSteps.length - 1 && <ChevronDown size={12} className="text-[#71717A] ml-auto" />}
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-theme bg-app">
+                    <Icon size={14} className="text-theme-secondary" />
+                    <span className="text-xs font-medium text-theme">{s.label}</span>
+                    {i < postSteps.length - 1 && <ChevronDown size={12} className="text-theme-tertiary ml-auto" />}
                   </div>
                 );
               })}
@@ -497,7 +492,7 @@ function Architecture() {
   );
 }
 
-/* ─── SECURITY ─── */
+/* --- SECURITY --- */
 function Security() {
   const items = [
     { icon: Shield, title: 'Permission Guard', desc: 'Every action requires explicit user approval. You stay in control.' },
@@ -511,7 +506,7 @@ function Security() {
   ];
 
   return (
-    <Section className="py-32 px-6 bg-[#0D0F12]" id="security">
+    <Section className="py-32 px-6 bg-app" id="security">
       <div className="max-w-6xl mx-auto">
         <SectionHeading label="Security" title="Built to be safe" desc="Security is not an afterthought. Every layer is designed with privacy and safety in mind." />
 
@@ -522,13 +517,13 @@ function Security() {
               <motion.div
                 key={i}
                 variants={fadeUp}
-                className="p-5 rounded-2xl border border-white/[0.07] bg-[#121419] hover:bg-[#181B21] hover:border-white/[0.12] transition-all duration-200"
+                className="p-5 rounded-2xl border border-theme bg-surface hover:bg-surface-hover hover:border-theme-strong transition-all duration-200"
               >
-                <div className="w-10 h-10 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/20 flex items-center justify-center mb-4">
-                  <Icon size={18} className="text-[#7C3AED]" />
+                <div className="w-10 h-10 rounded-xl bg-surface-2 border border-theme flex items-center justify-center mb-4">
+                  <Icon size={18} className="text-theme" />
                 </div>
-                <h3 className="text-sm font-semibold text-[#F4F4F5] mb-1.5">{item.title}</h3>
-                <p className="text-[12px] text-[#71717A] leading-relaxed">{item.desc}</p>
+                <h3 className="text-sm font-semibold text-theme mb-1.5">{item.title}</h3>
+                <p className="text-[12px] text-theme-tertiary leading-relaxed">{item.desc}</p>
               </motion.div>
             );
           })}
@@ -538,12 +533,12 @@ function Security() {
   );
 }
 
-/* ─── FAQ ─── */
+/* --- FAQ --- */
 function FAQ() {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   const faqs = [
-    { q: 'What is ACO?', a: 'ACO (Autonomous Computer Operator) is an AI-powered agent that understands natural language commands and executes real computer actions — browsing the web, managing files, running terminal commands, and interacting with desktop applications.' },
+    { q: 'What is ACO?', a: 'ACO (Autonomous Computer Operator) is an AI-powered agent that understands natural language commands and executes real computer actions -- browsing the web, managing files, running terminal commands, and interacting with desktop applications.' },
     { q: 'How does it work?', a: 'ACO uses a multi-agent architecture. When you give it a task, the AI planner decomposes it into a workflow. Specialized agents (browser, desktop, terminal, file, vision) execute each step. A verification engine validates results, and a recovery engine handles failures automatically.' },
     { q: 'Does it support local models?', a: 'Yes. ACO has first-class support for Ollama, allowing you to run entirely on your machine with models like Qwen, LLaMA, and Mistral. Your data never leaves your computer.' },
     { q: 'Can I use Ollama?', a: 'Absolutely. Ollama is a first-class provider in ACO. Simply install Ollama, pull your preferred model, and ACO will use it for planning and execution.' },
@@ -564,14 +559,14 @@ function FAQ() {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="rounded-xl border border-white/[0.07] bg-[#121419] overflow-hidden"
+              className="rounded-xl border border-theme bg-surface overflow-hidden"
             >
               <button
                 onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[#181B21] transition-colors"
+                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-hover transition-colors"
               >
-                <span className="text-sm font-medium text-[#F4F4F5]">{faq.q}</span>
-                <ChevronDown size={14} className={`text-[#71717A] transition-transform duration-200 shrink-0 ml-4 ${
+                <span className="text-sm font-medium text-theme">{faq.q}</span>
+                <ChevronDown size={14} className={`text-theme-tertiary transition-transform duration-200 shrink-0 ml-4 ${
                   openIdx === i ? 'rotate-180' : ''
                 }`} />
               </button>
@@ -584,7 +579,7 @@ function FAQ() {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <p className="px-5 pb-4 text-[13px] text-[#71717A] leading-relaxed">{faq.a}</p>
+                    <p className="px-5 pb-4 text-[13px] text-theme-tertiary leading-relaxed">{faq.a}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -596,36 +591,31 @@ function FAQ() {
   );
 }
 
-/* ─── CTA ─── */
+/* --- CTA --- */
 function CTA() {
   return (
-    <section className="py-32 px-6 bg-[#0D0F12]">
+    <section className="py-32 px-6 bg-app">
       <div className="max-w-3xl mx-auto text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="relative p-12 rounded-3xl border border-white/[0.07] bg-[#121419]"
+          className="relative p-12 rounded-3xl border border-theme bg-surface"
         >
-          {/* Subtle radial glow */}
-          <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] rounded-full bg-[#7C3AED]/[0.05] blur-[80px]" />
-          </div>
-          
           <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#F4F4F5] mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-theme mb-4">
               Ready to automate?
             </h2>
-            <p className="text-[#71717A] text-sm mb-8 max-w-md mx-auto">
+            <p className="text-theme-tertiary text-sm mb-8 max-w-md mx-auto">
               Start building autonomous workflows today. Open source, local-first, and free.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <a href="/login"
-                className="flex items-center gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
+                className="flex items-center gap-2 bg-text-primary hover:opacity-90 text-text-inverse px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200">
                 Get Started <ArrowRight size={16} />
               </a>
               <a href="#features"
-                className="flex items-center gap-2 bg-[#181B21] hover:bg-[#0D0F12] text-[#F4F4F5] px-6 py-3 rounded-xl text-sm font-medium transition-all border border-white/[0.07]">
+                className="flex items-center gap-2 bg-surface-hover hover:bg-surface text-theme px-6 py-3 rounded-xl text-sm font-medium transition-all border border-theme">
                 Learn More
               </a>
             </div>
@@ -636,49 +626,49 @@ function CTA() {
   );
 }
 
-/* ─── FOOTER ─── */
+/* --- FOOTER --- */
 function Footer() {
   return (
-    <footer className="border-t border-white/[0.07] py-12 px-6 bg-[#08090B]">
+    <footer className="border-t border-theme py-12 px-6 bg-surface">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-[#7C3AED]/10 flex items-center justify-center">
-                <Cpu size={14} className="text-[#7C3AED]" />
+              <div className="w-7 h-7 rounded-lg bg-surface-2 flex items-center justify-center">
+                <Cpu size={14} className="text-theme" />
               </div>
-              <span className="font-bold text-sm text-[#F4F4F5]">ACO</span>
+              <span className="font-bold text-sm text-theme">ACO</span>
             </div>
-            <p className="text-[12px] text-[#71717A] leading-relaxed">
+            <p className="text-[12px] text-theme-tertiary leading-relaxed">
               Your Autonomous Computer Operator.
               <br />Think Less. Execute More.
             </p>
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-[#71717A] uppercase tracking-wider mb-3">Product</h4>
+            <h4 className="text-[11px] font-semibold text-theme-tertiary uppercase tracking-wider mb-3">Product</h4>
             <div className="space-y-2">
-              <a href="#features" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Features</a>
-              <a href="#architecture" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Architecture</a>
-              <a href="#security" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Security</a>
+              <a href="#features" className="block text-[12px] text-theme-tertiary hover:text-theme transition-colors">Features</a>
+              <a href="#architecture" className="block text-[12px] text-theme-tertiary hover:text-theme transition-colors">Architecture</a>
+              <a href="#security" className="block text-[12px] text-theme-tertiary hover:text-theme transition-colors">Security</a>
             </div>
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-[#71717A] uppercase tracking-wider mb-3">Getting Started</h4>
+            <h4 className="text-[11px] font-semibold text-theme-tertiary uppercase tracking-wider mb-3">Getting Started</h4>
             <div className="space-y-2">
-              <a href="/login" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Sign In</a>
-              <a href="#features" className="block text-[12px] text-[#71717A] hover:text-[#F4F4F5] transition-colors">Features</a>
+              <a href="/login" className="block text-[12px] text-theme-tertiary hover:text-theme transition-colors">Sign In</a>
+              <a href="#features" className="block text-[12px] text-theme-tertiary hover:text-theme transition-colors">Features</a>
             </div>
           </div>
           <div>
-            <h4 className="text-[11px] font-semibold text-[#71717A] uppercase tracking-wider mb-3">Legal</h4>
+            <h4 className="text-[11px] font-semibold text-theme-tertiary uppercase tracking-wider mb-3">Legal</h4>
             <div className="space-y-2">
-              <span className="block text-[12px] text-[#71717A]/60">MIT License</span>
+              <span className="block text-[12px] text-theme-tertiary/60">MIT License</span>
             </div>
           </div>
         </div>
 
-        <div className="border-t border-white/[0.07] pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-[11px] text-[#71717A]/60">
+        <div className="border-t border-theme pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-[11px] text-theme-tertiary/60">
             &copy; 2026 ACO. Built with FastAPI, LangGraph, Playwright, Next.js, MongoDB, and Tailwind.
           </p>
         </div>
@@ -687,10 +677,10 @@ function Footer() {
   );
 }
 
-/* ─── MAIN PAGE ─── */
+/* --- MAIN PAGE --- */
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#08090B] text-[#F4F4F5] overflow-x-hidden">
+    <div className="min-h-screen bg-app text-theme overflow-x-hidden">
       <Navbar />
       <Hero />
       <Features />

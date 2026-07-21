@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { getCached, setCache, STALE_TIMES } from '@/lib/cache';
 
 export function useBackendHealth() {
   const [connected, setConnected] = useState(false);
@@ -113,14 +114,20 @@ export function useFileSearch() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const search = useCallback(async (q: string) => {
     setQuery(q);
     if (q.length < 2 || !token) { setResults([]); return; }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
-    try { const r = await api.searchFiles(q, token); setResults(r.results || []); }
-    catch { setResults([]); }
-    finally { setLoading(false); }
+    try {
+      const r = await api.searchFiles(q, token);
+      if (!controller.signal.aborted) setResults(r.results || []);
+    } catch { if (!controller.signal.aborted) setResults([]); }
+    finally { if (!controller.signal.aborted) setLoading(false); }
   }, [token]);
 
   return { query, results, loading, search };
@@ -203,14 +210,17 @@ export function useIndexStats() {
 
 export function useDashboardMetrics() {
   const { token } = useAuth();
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<any>(() => getCached('dashboard', STALE_TIMES.DASHBOARD));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
+    const cached = getCached('dashboard', STALE_TIMES.DASHBOARD);
+    if (cached) { setMetrics(cached); setLoading(false); return; }
     try {
       const data = await api.getDashboard(token);
+      setCache('dashboard', data, STALE_TIMES.DASHBOARD);
       setMetrics(data);
       setError(null);
     } catch (e: any) {
@@ -222,7 +232,7 @@ export function useDashboardMetrics() {
 
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 5000);
+    const interval = setInterval(refresh, 30_000);
     return () => clearInterval(interval);
   }, [refresh]);
 

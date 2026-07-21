@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, CheckCircle2, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LogMessage {
@@ -24,47 +23,42 @@ export function LiveConsole({ logs, wsConnected }: LiveConsoleProps) {
   }, [logs]);
 
   return (
-    <div className="flex flex-col h-full rounded-[10px] border border-white/[0.07] bg-[#08090B] overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.07] bg-[#121419] shrink-0">
+    <div className="flex flex-col h-full rounded-xl border border-theme bg-surface overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-theme bg-surface-2 shrink-0">
         <div className="flex items-center gap-2">
-          <Terminal size={13} className="text-[#7C3AED]" />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A1A1AA]">Console</span>
+          <Terminal size={13} className="text-theme-secondary" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-theme-tertiary">Console</span>
         </div>
         <div className="flex items-center gap-2">
           {wsConnected && (
-            <span className="flex items-center gap-1.5 text-[10px] text-[#ADFF2F]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#ADFF2F] animate-pulse" />
+            <span className="flex items-center gap-1.5 text-[10px] text-status-active">
+              <span className="h-1.5 w-1.5 rounded-full bg-status-active animate-pulse" />
               Live
             </span>
           )}
-          <span className="text-[10px] text-[#71717A]">{logs.length} entries</span>
+          <span className="text-[10px] text-theme-tertiary">{logs.length} entries</span>
         </div>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 font-mono text-[11px] space-y-1">
         {logs.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-[#71717A] gap-2">
-            <Terminal size={24} className="text-[#71717A]/50" />
+          <div className="h-full flex flex-col items-center justify-center text-theme-tertiary gap-2">
+            <Terminal size={24} className="text-border-strong" />
             <p className="text-[11px]">Console waiting for workflow logs...</p>
           </div>
         ) : (
-          <AnimatePresence initial={false}>
-            {logs.map((log, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.15 }}
-                className={cn(
-                  'flex gap-2 leading-relaxed',
-                  log.level === 'error' ? 'text-[#F87171]' :
-                  log.level === 'warn' ? 'text-[#FBBF24]' : 'text-[#A1A1AA]'
-                )}
-              >
-                <span className="text-[#71717A] shrink-0 w-16">{log.time}</span>
-                <span className="break-all leading-relaxed">{log.message}</span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          logs.map((log, i) => (
+            <div
+              key={i}
+              className={cn(
+                'flex gap-2 leading-relaxed animate-[fadeIn_0.15s_ease-out]',
+                log.level === 'error' ? 'text-status-error' :
+                log.level === 'warn' ? 'text-status-warning' : 'text-theme-secondary'
+              )}
+            >
+              <span className="text-theme-tertiary shrink-0 w-16">{log.time}</span>
+              <span className="break-all leading-relaxed">{log.message}</span>
+            </div>
+          ))
         )}
       </div>
     </div>

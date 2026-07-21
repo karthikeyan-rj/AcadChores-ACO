@@ -1,6 +1,7 @@
 import asyncio
 import time
 import logging
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, AsyncIterator
 
 from app.ai.providers.base.provider import LLMProvider
@@ -209,7 +210,7 @@ class ProviderManager:
         m.total_tokens_output += tokens_out
         m.total_latency_ms += latency_ms
         m.total_cost += cost
-        m.last_request_at = __import__("datetime").datetime.utcnow().isoformat()
+        m.last_request_at = datetime.now(timezone.utc).isoformat()
 
 
 provider_manager = ProviderManager()

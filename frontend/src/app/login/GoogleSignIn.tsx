@@ -12,7 +12,7 @@ interface Props {
 export default function GoogleSignIn({ onSuccess, onError }: Props) {
   if (!CLIENT_ID) {
     return (
-      <div className="text-xs text-gray-500 text-center py-2">Google sign-in not configured</div>
+      <div className="text-xs text-theme-secondary text-center py-2">Google sign-in not configured</div>
     );
   }
 

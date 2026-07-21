@@ -3,7 +3,7 @@ import os
 import logging
 import asyncio
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from bson import ObjectId
 
@@ -85,7 +85,7 @@ _load_from_disk()
 def _to_doc(data: dict) -> dict:
     if "_id" not in data:
         data["_id"] = ObjectId()
-    data["updated_at"] = datetime.utcnow().isoformat()
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
     return data
 
 
@@ -152,7 +152,7 @@ class MemoryDB:
                     else:
                         safe_update[uk] = uv
                 doc.update(safe_update)
-                doc["updated_at"] = datetime.utcnow().isoformat()
+                doc["updated_at"] = datetime.now(timezone.utc).isoformat()
                 _save_to_disk()
                 return True
         return False

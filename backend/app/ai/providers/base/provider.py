@@ -4,18 +4,11 @@ from typing import AsyncIterator, Dict, List, Optional, Any
 from app.ai.providers.base.types import (
     ProviderCapabilities,
     ProviderHealth,
-    ProviderMetrics,
     ModelInfo,
     CompletionRequest,
     CompletionResponse,
     EmbeddingRequest,
     EmbeddingResponse,
-)
-from app.ai.providers.base.exceptions import (
-    ProviderUnavailable,
-    ModelNotFound,
-    StreamingNotSupported,
-    ToolCallNotSupported,
 )
 
 
@@ -47,35 +40,29 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def generate(self, request: CompletionRequest) -> CompletionResponse:
-        """Send a completion request and return the full response."""
+        """Send a completion request and return the full response.
+
+        The request may carry api_key and base_url injected by the credential
+        service. Providers must NOT access the database directly.
+        """
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
         """Stream a completion response token by token."""
+        from app.ai.providers.base.exceptions import StreamingNotSupported
         raise StreamingNotSupported(self.name)
 
-    @abstractmethod
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
-        """Generate embeddings for input text."""
+        """Generate embeddings for input text. Only if supports_embeddings=True."""
+        from app.ai.providers.base.exceptions import ProviderError
+        raise ProviderError(f"Embeddings not supported by '{self.name}'", provider=self.name, recoverable=False)
 
-    @abstractmethod
+    async def list_models(self) -> List[ModelInfo]:
+        """List available models from this provider. Only if supports_model_discovery=True."""
+        return []
+
     async def health(self) -> ProviderHealth:
         """Check provider availability and return health status."""
-
-    @abstractmethod
-    async def list_models(self) -> List[ModelInfo]:
-        """List available models from this provider."""
-
-    async def tool_call(self, request: CompletionRequest) -> CompletionResponse:
-        """Execute a tool/function call. Only valid when supports_tools=True."""
-        raise ToolCallNotSupported(self.name)
-
-    async def download_model(self, model_id: str) -> bool:
-        """Download a model (Ollama-specific)."""
-        raise ModelNotFound(model_id, self.name)
-
-    async def delete_model(self, model_id: str) -> bool:
-        """Delete a model (Ollama-specific)."""
-        raise ModelNotFound(model_id, self.name)
+        return ProviderHealth(available=False, provider=self.name, error="Not implemented")
 
     async def shutdown(self) -> None:
         """Perform cleanup on shutdown."""

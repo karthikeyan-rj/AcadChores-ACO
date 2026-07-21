@@ -5,7 +5,7 @@ import asyncio
 import traceback
 from typing import Dict, Any, Optional
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.database import db_manager
 from app.core.event_bus import event_bus
@@ -84,7 +84,7 @@ class TaskQueue:
             "task_id": task_id,
             "execution_id": execution_id,
             "step_data": step_data,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
 
         status_mapping = {
@@ -178,7 +178,10 @@ class WorkerPool:
                 await self._execute_task(worker_id, task_id, execution_id, step_data)
 
             except asyncio.CancelledError:
-                break
+                # Don't break — log and continue the loop so the worker
+                # can process future tasks after a cancellation.
+                logger.warning(f"Worker-{worker_id}: CancelledError caught, continuing loop")
+                continue
             except Exception as e:
                 logger.error(f"Worker-{worker_id} encountered queue read error: {e}")
                 await asyncio.sleep(2)
@@ -276,16 +279,19 @@ class WorkerPool:
                     raise
 
             async def _periodic_cancel_check(eid: str, interval: float):
-                """Periodically check if the execution was cancelled."""
+                """Periodically check if the execution was cancelled or stopping."""
                 from app.services.state_machine import WorkflowStateMachine, WorkflowState
                 while True:
                     await asyncio.sleep(interval)
                     try:
                         status = await WorkflowStateMachine.get_status(eid)
-                        if status == WorkflowState.CANCELLED.value:
-                            # Cancel the process tree
+                        if status in (WorkflowState.CANCELLED.value, WorkflowState.STOPPING.value):
+                            # Kill the process tree
                             from app.services.process_manager import cancel_process
                             cancel_process(eid)
+                            # If STOPPING, transition to CANCELLED
+                            if status == WorkflowState.STOPPING.value:
+                                await WorkflowStateMachine.transition_to(eid, WorkflowState.CANCELLED)
                             return
                     except Exception:
                         pass

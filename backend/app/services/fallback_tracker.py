@@ -1,8 +1,17 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+
+def _get_db():
+    """Get the Motor database from db_manager. Returns None if unavailable."""
+    try:
+        from app.core.database import db_manager
+        return db_manager.db
+    except Exception:
+        return None
 
 
 async def record_fallback_usage(
@@ -19,15 +28,15 @@ async def record_fallback_usage(
     latency_ms: float = 0.0,
 ) -> None:
     try:
-        from app.core.database import get_database
-        from motor.motor_asyncio import AsyncIOMotorDatabase
-
-        db: AsyncIOMotorDatabase = await get_database()
+        db = _get_db()
+        if db is None:
+            logger.warning("record_fallback_usage: database unavailable")
+            return
         doc = {
             "user_id": str(user_id),
             "provider": provider,
             "model": model,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "fallback_reason": fallback_reason,
             "planner_source": planner_source,
             "local_attempts": local_attempts,
@@ -44,11 +53,11 @@ async def record_fallback_usage(
 
 async def get_daily_usage_count(user_id: str) -> int:
     try:
-        from app.core.database import get_database
-        from motor.motor_asyncio import AsyncIOMotorDatabase
-
-        db: AsyncIOMotorDatabase = await get_database()
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        db = _get_db()
+        if db is None:
+            logger.warning("get_daily_usage_count: database unavailable")
+            return 0
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         count = await db.fallback_usage.count_documents({
             "user_id": str(user_id),
             "timestamp": {"$gte": today_start},
@@ -61,11 +70,11 @@ async def get_daily_usage_count(user_id: str) -> int:
 
 async def get_usage_stats(user_id: str, days: int = 30) -> Dict[str, Any]:
     try:
-        from app.core.database import get_database
-        from motor.motor_asyncio import AsyncIOMotorDatabase
-
-        db: AsyncIOMotorDatabase = await get_database()
-        since = datetime.utcnow() - timedelta(days=days)
+        db = _get_db()
+        if db is None:
+            logger.warning("get_usage_stats: database unavailable")
+            return {"total_calls": 0, "success_calls": 0, "failure_calls": 0, "success_rate": 0}
+        since = datetime.now(timezone.utc) - timedelta(days=days)
         cursor = db.fallback_usage.find({"user_id": str(user_id), "timestamp": {"$gte": since}})
         total_calls = 0
         success_calls = 0

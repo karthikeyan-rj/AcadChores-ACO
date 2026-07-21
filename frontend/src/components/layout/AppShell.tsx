@@ -1,17 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   MessageSquare, GitBranch, History, FileText, BarChart3,
   Settings, LayoutDashboard, PanelLeftClose,
-  PanelLeft, Search, ChevronDown, Cpu, User, Menu, LogOut, Server
+  PanelLeft, Search, ChevronDown, Cpu, User, Menu, LogOut, Server, Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
+import { useSystemHealth } from '@/lib/health';
+import { useWorkflowStore } from '@/lib/workflow-store';
 import { CommandPalette } from '@/components/modals/CommandPalette';
+import { PageSkeleton } from '@/components/ui/PageSkeleton';
 
 const navItems = [
   { id: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -23,62 +26,21 @@ const navItems = [
   { id: '/settings', icon: Settings, label: 'Settings' },
 ];
 
-interface ServiceStatus {
-  name: string;
-  status: 'connected' | 'disconnected' | 'disabled' | 'reconnecting';
-  label?: string;
-}
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, token, logout, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { services, overallStatus } = useSystemHealth();
+  const { hasActiveWorkflow, status: workflowStatus } = useWorkflowStore();
   const [collapsed, setCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-  const [services, setServices] = useState<ServiceStatus[]>([]);
   const profileRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const cmdTriggerRef = useRef<HTMLButtonElement>(null);
-
-  const checkServices = useCallback(async () => {
-    const results: ServiceStatus[] = [];
-    try {
-      const health = await api.healthDetail();
-      results.push({ name: 'Backend API', status: health.status === 'healthy' ? 'connected' : 'disconnected' });
-
-      // MongoDB status from health endpoint
-      const dbStatus = health.mongodb.status === 'connected' ? 'connected' : 'disconnected';
-      const dbLabel = health.mongodb.mode === 'atlas'
-        ? `Atlas — ${health.mongodb.database || 'aco'}`
-        : health.mongodb.mode === 'local'
-        ? `Local — ${health.mongodb.database || 'aco'}`
-        : 'In-memory (no persistence)';
-      results.push({ name: 'MongoDB', status: dbStatus, label: dbLabel });
-
-      // Redis status
-      const redisStatus = health.redis.status === 'connected' ? 'connected'
-        : health.redis.status === 'disabled' ? 'disabled' : 'disconnected';
-      results.push({ name: 'Redis', status: redisStatus, label: health.redis.status === 'connected' ? 'Connected' : 'Disabled' });
-    } catch {
-      results.push({ name: 'Backend API', status: 'disconnected' });
-      results.push({ name: 'MongoDB', status: 'disconnected', label: 'Unknown' });
-      results.push({ name: 'Redis', status: 'disconnected', label: 'Unknown' });
-    }
-    results.push({ name: 'Ollama', status: 'connected', label: 'Connected' });
-    results.push({ name: 'Browser Agent', status: 'connected', label: 'Ready' });
-    results.push({ name: 'Worker Pool', status: 'connected', label: '3 active' });
-    results.push({ name: 'WebSocket', status: 'connected' });
-    setServices(results);
-  }, []);
-
-  useEffect(() => {
-    checkServices();
-    const i = setInterval(checkServices, 8000);
-    return () => clearInterval(i);
-  }, [checkServices]);
 
   useEffect(() => {
     try {
@@ -94,9 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [user, authLoading, pathname, router]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('aco-sidebar-collapsed', String(collapsed));
-    } catch {}
+    try { localStorage.setItem('aco-sidebar-collapsed', String(collapsed)); } catch {}
   }, [collapsed]);
 
   useEffect(() => {
@@ -114,9 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!profileOpen) return;
     const handler = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setProfileOpen(false);
-      }
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -125,9 +83,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!statusOpen) return;
     const handler = (e: MouseEvent) => {
-      if (statusRef.current && !statusRef.current.contains(e.target as Node)) {
-        setStatusOpen(false);
-      }
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) setStatusOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -139,53 +95,38 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (authLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#08090B]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#181B21] flex items-center justify-center">
-            <Cpu size={18} className="text-[#7C3AED]" />
-          </div>
-          <span className="text-xs text-[#71717A]">Loading...</span>
-        </div>
-      </div>
-    );
-  }
+  if (!user && !authLoading) return null;
 
-  if (!user) return null;
+  const sidebarWidth = collapsed ? 56 : 248;
 
-  const sidebarWidth = collapsed ? 56 : 200;
+  const overallDotClass = overallStatus === 'connected' ? 'bg-status-active'
+    : overallStatus === 'degraded' ? 'bg-status-warning'
+    : 'bg-status-error';
 
-  const overallStatus = services.length === 0 ? 'disconnected'
-    : services.every(s => s.status === 'connected') ? 'connected'
-    : services.some(s => s.status === 'disconnected') ? 'degraded'
-    : 'connected';
-
-  const overallColor = overallStatus === 'connected' ? 'bg-[#4ADE80]'
-    : overallStatus === 'degraded' ? 'bg-[#FBBF24]'
-    : 'bg-[#F87171]';
+  const overallTextClass = overallStatus === 'connected' ? 'text-status-active'
+    : overallStatus === 'degraded' ? 'text-status-warning'
+    : 'text-status-error';
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#08090B] text-[#F4F4F5]">
+    <div className="flex h-screen w-screen overflow-hidden bg-app text-theme">
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(s) => { router.push(s); }} triggerRef={cmdTriggerRef} />
 
-      {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 bg-black/32 z-40 lg:hidden"
             onClick={() => setMobileOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
       <aside
         className={cn(
-          'h-full border-r border-white/[0.07] bg-[#0D0F12] flex flex-col no-select shrink-0 z-50',
+          'h-full border-r border-theme bg-sidebar flex flex-col no-select shrink-0 z-50',
           'fixed lg:relative transition-[width,transform] duration-200 ease-out',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
@@ -193,16 +134,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         role="navigation"
         aria-label="Main navigation"
       >
-        {/* Brand header with collapse toggle */}
-        <div className="h-[48px] flex items-center justify-between px-3 border-b border-white/[0.07] shrink-0">
+        <div className="h-[56px] flex items-center justify-between px-3 border-b border-theme shrink-0">
           <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-[#7C3AED]/12 flex items-center justify-center shrink-0">
-              <Cpu size={16} className="text-[#7C3AED]" />
+            <div className="w-7 h-7 rounded-lg bg-theme text-theme-inverse flex items-center justify-center shrink-0">
+              <Cpu size={15} />
             </div>
             {!collapsed && (
               <div className="overflow-hidden">
-                <span className="font-semibold text-[13px] whitespace-nowrap text-[#F4F4F5]">ACO</span>
-                <span className="text-[9px] text-[#71717A] ml-1.5 whitespace-nowrap">v1.0</span>
+                <span className="font-semibold text-[13px] whitespace-nowrap text-theme">ACO</span>
+                <span className="text-[9px] text-theme-tertiary ml-1.5 whitespace-nowrap">v1.0</span>
               </div>
             )}
           </div>
@@ -210,7 +150,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setCollapsed(p => !p)}
             className={cn(
               'shrink-0 rounded-md transition-all duration-150 cursor-pointer',
-              'text-[#71717A] hover:text-[#F4F4F5] hover:bg-white/[0.06]',
+              'text-theme-tertiary hover:text-theme hover:bg-surface-hover',
               collapsed ? 'p-1.5' : 'p-1.5'
             )}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -220,8 +160,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-2 px-1.5 space-y-0.5 overflow-y-auto" aria-label="Sidebar">
+        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto" aria-label="Sidebar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.id || (item.id !== '/' && pathname.startsWith(item.id));
@@ -236,21 +175,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   'w-full flex items-center gap-2.5 rounded-lg transition-all duration-150 cursor-pointer group relative',
                   collapsed ? 'justify-center px-2 h-10' : 'px-2.5 h-10',
                   isActive
-                    ? 'bg-[#7C3AED]/12 text-[#7C3AED]'
-                    : 'text-[#A1A1AA] hover:text-[#F4F4F5] hover:bg-white/[0.04]'
+                    ? 'bg-[var(--surface-active)] border border-theme text-theme'
+                    : 'text-theme-secondary hover:text-theme hover:bg-surface-hover border border-transparent'
                 )}
               >
-                <Icon size={17} className={cn('shrink-0', isActive && 'text-[#7C3AED]')} />
+                <Icon size={18} className={cn('shrink-0', isActive && 'text-theme')} />
+                {item.id === '/chat' && hasActiveWorkflow && (
+                  <span className={cn(
+                    'absolute right-2 top-2 h-1.5 w-1.5 rounded-full',
+                    workflowStatus === 'Planning' ? 'bg-status-warning animate-pulse'
+                    : workflowStatus === 'Stopping' ? 'bg-status-error animate-pulse'
+                    : 'bg-status-active animate-pulse'
+                  )} />
+                )}
                 {!collapsed && (
-                  <span className="text-[12.5px] font-medium truncate whitespace-nowrap">
+                  <span className="text-[13px] font-medium truncate whitespace-nowrap">
                     {item.label}
                   </span>
                 )}
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r bg-[#7C3AED]" />
-                )}
                 {collapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-[#181B21] border border-white/[0.07] text-[11px] text-[#F4F4F5] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                  <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-surface border border-theme text-[11px] text-theme whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-theme-dropdown">
                     {item.label}
                   </div>
                 )}
@@ -259,56 +203,78 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
+        {hasActiveWorkflow && !collapsed && (
+          <div className="mx-2 mb-2 px-2.5 py-2 rounded-lg border border-status-active/30 bg-surface">
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                'h-1.5 w-1.5 rounded-full shrink-0',
+                workflowStatus === 'Planning' ? 'bg-status-warning animate-pulse'
+                : workflowStatus === 'Stopping' ? 'bg-status-error animate-pulse'
+                : 'bg-status-active animate-pulse'
+              )} />
+              <span className="text-[11px] font-medium text-status-active truncate">
+                {workflowStatus === 'Planning' ? 'Planning...'
+                 : workflowStatus === 'Executing' ? 'Running...'
+                 : workflowStatus === 'Waiting' ? 'Awaiting...'
+                 : workflowStatus === 'Stopping' ? 'Stopping...'
+                 : workflowStatus}
+              </span>
+            </div>
+            <button
+              onClick={() => { router.push('/chat'); setMobileOpen(false); }}
+              className="mt-1 text-[10px] text-status-active/70 hover:text-status-active transition cursor-pointer"
+            >
+              View in Assistant
+            </button>
+          </div>
+        )}
+
         <div className="h-2 shrink-0" />
       </aside>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top bar */}
-        <header className="h-[48px] border-b border-white/[0.07] bg-[#08090B] flex items-center justify-between px-4 no-select shrink-0">
+        <header className="h-[56px] border-b border-theme bg-header backdrop-blur-sm flex items-center justify-between px-4 no-select shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(p => !p)}
-              className="lg:hidden p-1 rounded-lg hover:bg-white/[0.04] transition text-[#A1A1AA] cursor-pointer"
+              className="lg:hidden p-1.5 rounded-lg hover:bg-surface-hover transition text-theme-secondary cursor-pointer"
               aria-label="Toggle mobile menu"
             >
               <Menu size={20} />
             </button>
-            <span className="text-[13px] font-medium text-[#F4F4F5]">
+            <span className="text-[14px] font-semibold text-theme">
               {navItems.find(n => pathname === n.id || pathname.startsWith(n.id))?.label || 'ACO'}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Search / Command trigger */}
             <button
               ref={cmdTriggerRef}
               onClick={() => setCmdOpen(true)}
-              className="search-shell flex items-center gap-2 px-3 py-1.5 rounded-lg text-[#71717A] text-[11px] hover:border-white/[0.12] hover:text-[#A1A1AA] transition cursor-pointer w-[220px]"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme bg-surface text-theme-tertiary text-[12px] hover:border-theme-strong hover:text-theme-secondary transition cursor-pointer w-[220px]"
               aria-label="Open command palette"
             >
               <Search size={13} />
               <span>Search or command...</span>
-              <kbd className="ml-auto text-[9px] bg-[#181B21] px-1.5 py-0.5 rounded border border-white/[0.07] font-mono text-[#71717A]">Ctrl+K</kbd>
+              <kbd className="ml-auto text-[9px] bg-surface-hover px-1.5 py-0.5 rounded border border-theme font-mono text-theme-tertiary">Ctrl+K</kbd>
             </button>
-            <div className="h-3.5 w-px bg-white/[0.07] mx-1" />
+            <div className="h-4 w-px bg-theme mx-1" />
 
-            {/* Profile dropdown */}
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setProfileOpen(p => !p)}
-                className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/[0.04] transition cursor-pointer"
+                className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-hover transition cursor-pointer"
                 aria-label="User menu"
                 aria-expanded={profileOpen}
                 aria-haspopup="true"
               >
-                {user.avatar_url ? (
+                {user?.avatar_url ? (
                   <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full" />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-[#7C3AED]/15 flex items-center justify-center text-[#7C3AED] text-[10px] font-bold">
-                    {user.name.charAt(0).toUpperCase()}
+                  <div className="w-6 h-6 rounded-full bg-theme text-theme-inverse flex items-center justify-center text-[10px] font-bold">
+                    {user?.name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                 )}
-                <ChevronDown size={13} className={cn('text-[#71717A] transition-transform duration-150', profileOpen && 'rotate-180')} />
+                <ChevronDown size={13} className={cn('text-theme-tertiary transition-transform duration-150', profileOpen && 'rotate-180')} />
               </button>
 
               <AnimatePresence>
@@ -318,28 +284,67 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
                     transition={{ duration: 0.12 }}
-                    className="absolute right-0 top-full mt-1 w-56 rounded-lg border border-white/[0.07] bg-[#121419] shadow-matte-lg overflow-hidden z-50"
+                    className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-theme bg-surface-elevated overflow-hidden z-50 shadow-theme-dropdown"
                     role="menu"
                     aria-label="User menu"
                   >
-                    <div className="px-3 py-2.5 border-b border-white/[0.07]">
-                      <p className="text-[12px] font-medium text-[#F4F4F5] truncate">{user.name}</p>
-                      <p className="text-[10px] text-[#71717A] truncate mt-0.5">{user.email}</p>
+                    <div className="px-3 py-2.5 border-b border-theme">
+                      <p className="text-[12px] font-medium text-theme truncate">{user?.name || 'User'}</p>
+                      <p className="text-[10px] text-theme-tertiary truncate mt-0.5">{user?.email || ''}</p>
                     </div>
                     <div className="p-1" role="group">
                       <button
                         onClick={() => { router.push('/settings'); setProfileOpen(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] text-[#A1A1AA] hover:text-[#F4F4F5] hover:bg-white/[0.04] transition cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] text-theme-secondary hover:text-theme hover:bg-surface-hover transition cursor-pointer"
                         role="menuitem"
                       >
                         <Settings size={14} />
                         <span>Settings</span>
                       </button>
                     </div>
-                    <div className="border-t border-white/[0.07] p-1">
+                    <div className="border-t border-theme p-1">
+                      <p className="px-3 py-1 text-[10px] font-medium text-theme-tertiary uppercase tracking-wider">Theme</p>
+                      <button
+                        onClick={() => setTheme('dark')}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[12px] transition cursor-pointer',
+                          theme === 'dark' ? 'text-theme font-medium' : 'text-theme-secondary hover:text-theme hover:bg-surface-hover'
+                        )}
+                        role="menuitem"
+                      >
+                        <span className={cn('w-2 h-2 rounded-full', theme === 'dark' ? 'bg-theme' : 'bg-theme-tertiary')} />
+                        <span>Dark Professional</span>
+                        {theme === 'dark' && <Check size={12} className="ml-auto text-theme" />}
+                      </button>
+                      <button
+                        onClick={() => setTheme('light')}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[12px] transition cursor-pointer',
+                          theme === 'light' ? 'text-theme font-medium' : 'text-theme-secondary hover:text-theme hover:bg-surface-hover'
+                        )}
+                        role="menuitem"
+                      >
+                        <span className={cn('w-2 h-2 rounded-full', theme === 'light' ? 'bg-theme' : 'bg-theme-tertiary')} />
+                        <span>Nordic Alabaster</span>
+                        {theme === 'light' && <Check size={12} className="ml-auto text-theme" />}
+                      </button>
+                      <button
+                        onClick={() => setTheme('system')}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[12px] transition cursor-pointer',
+                          theme === 'system' ? 'text-theme font-medium' : 'text-theme-secondary hover:text-theme hover:bg-surface-hover'
+                        )}
+                        role="menuitem"
+                      >
+                        <span className={cn('w-2 h-2 rounded-full', theme === 'system' ? 'bg-theme' : 'bg-theme-tertiary')} />
+                        <span>System</span>
+                        {theme === 'system' && <Check size={12} className="ml-auto text-theme" />}
+                      </button>
+                    </div>
+                    <div className="border-t border-theme p-1">
                       <button
                         onClick={() => { logout(); router.replace('/login'); setProfileOpen(false); }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] text-[#F87171] hover:bg-[#F87171]/5 transition cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] text-status-error hover:bg-status-error-soft transition cursor-pointer"
                         role="menuitem"
                       >
                         <LogOut size={14} />
@@ -353,78 +358,65 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 overflow-y-auto p-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className="h-full"
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          {authLoading ? <PageSkeleton /> : children}
         </main>
 
-        {/* Bottom bar — minimal, with system status right */}
-        <footer className="h-7 border-t border-white/[0.07] bg-[#08090B] flex items-center justify-between px-4 no-select text-[10px] text-[#71717A] font-mono shrink-0">
+        <footer className="h-7 border-t border-theme bg-header backdrop-blur-sm flex items-center justify-between px-4 no-select text-[10px] text-theme-tertiary font-mono shrink-0">
           <div className="flex items-center gap-3">
-            <span>{user.email}</span>
+            <span>{user?.email || ''}</span>
           </div>
           <div className="relative" ref={statusRef}>
             <button
               onClick={() => setStatusOpen(p => !p)}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-md hover:bg-white/[0.04] transition cursor-pointer"
+              className="flex items-center gap-2 px-2.5 py-1 rounded-md hover:bg-surface-hover transition cursor-pointer"
               aria-label="System status"
               aria-expanded={statusOpen}
             >
-              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', overallColor)} />
+              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', overallDotClass)} />
               <span>System</span>
-              <Server size={10} className="text-[#71717A]" />
+              <Server size={10} className="text-theme-tertiary" />
             </button>
 
             <AnimatePresence>
               {statusOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 4, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
                   transition={{ duration: 0.12 }}
-                  className="absolute right-0 bottom-full mb-2 w-[240px] rounded-lg border border-white/[0.07] bg-[#121419] shadow-matte-lg overflow-hidden z-50"
+                  className="absolute right-0 bottom-full mb-2 w-[260px] rounded-xl border border-theme bg-surface-elevated overflow-hidden z-50 shadow-theme-dropdown"
                   role="dialog"
                   aria-label="System services status"
                 >
-                  <div className="px-3 py-2 border-b border-white/[0.07] flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-[#F4F4F5]">System Services</span>
-                    <span className={cn('text-[9px] font-medium', overallStatus === 'connected' ? 'text-[#4ADE80]' : overallStatus === 'degraded' ? 'text-[#FBBF24]' : 'text-[#F87171]')}>
+                  <div className="px-3 py-2.5 border-b border-theme flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-theme">System Services</span>
+                    <span className={cn('text-[9px] font-medium', overallTextClass)}>
                       {overallStatus === 'connected' ? 'All Operational' : overallStatus === 'degraded' ? 'Degraded' : 'Offline'}
                     </span>
                   </div>
                   <div className="p-2 space-y-0.5">
-                    {services.map((s) => (
-                      <div key={s.name} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition">
-                        <span className="text-[11px] text-[#A1A1AA]">{s.name}</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className={cn('h-1.5 w-1.5 rounded-full',
-                            s.status === 'connected' ? 'bg-[#4ADE80]'
-                            : s.status === 'disabled' ? 'bg-[#71717A]'
-                            : s.status === 'reconnecting' ? 'bg-[#FBBF24]'
-                            : 'bg-[#F87171]'
-                          )} />
-                          <span className={cn('text-[9px] font-medium',
-                            s.status === 'connected' ? 'text-[#4ADE80]'
-                            : s.status === 'disabled' ? 'text-[#71717A]'
-                            : s.status === 'reconnecting' ? 'text-[#FBBF24]'
-                            : 'text-[#F87171]'
-                          )}>
-                            {s.label || (s.status === 'connected' ? 'Connected' : s.status === 'disabled' ? 'Disabled' : s.status === 'reconnecting' ? 'Reconnecting' : 'Disconnected')}
+                    {services.map((s) => {
+                      const dotClass = s.status === 'connected' ? 'bg-status-active'
+                        : s.status === 'disabled' ? 'bg-theme-tertiary'
+                        : s.status === 'reconnecting' ? 'bg-status-warning'
+                        : 'bg-status-error';
+                      const labelClass = s.status === 'connected' ? 'text-status-active'
+                        : s.status === 'disabled' ? 'text-theme-tertiary'
+                        : s.status === 'reconnecting' ? 'text-status-warning'
+                        : 'text-status-error';
+                      return (
+                        <div key={s.name} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-surface-hover transition">
+                          <span className="text-[11px] text-theme-secondary">{s.name}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={cn('h-1.5 w-1.5 rounded-full', dotClass)} />
+                            <span className={cn('text-[9px] font-medium', labelClass)}>
+                              {s.label || (s.status === 'connected' ? 'Connected' : s.status === 'disabled' ? 'Disabled' : s.status === 'reconnecting' ? 'Reconnecting' : 'Disconnected')}
+                            </span>
                           </span>
-                        </span>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}

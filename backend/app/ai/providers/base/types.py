@@ -21,13 +21,13 @@ class Message:
 @dataclass
 class ProviderCapabilities:
     supports_streaming: bool = False
-    supports_json: bool = False
-    supports_vision: bool = False
     supports_embeddings: bool = False
-    supports_function_calling: bool = False
-    supports_images: bool = False
+    supports_model_discovery: bool = False
+    supports_structured_output: bool = False
+    supports_reasoning: bool = False
     supports_system_prompt: bool = False
     supports_tools: bool = False
+    supports_vision: bool = False
 
 
 @dataclass
@@ -48,6 +48,13 @@ class ModelInfo:
     id: str
     provider: str
     name: str
+    context_length: Optional[int] = None
+    supports_structured_output: bool = False
+    supports_reasoning: bool = False
+    supports_vision: bool = False
+    supports_tools: bool = False
+    supports_embeddings: bool = False
+    is_deprecated: bool = False
     size_bytes: Optional[int] = None
     quantization: Optional[str] = None
     modified_at: Optional[str] = None
@@ -63,6 +70,10 @@ class CompletionRequest:
     stream: bool = False
     tools: Optional[List[Dict[str, Any]]] = None
     response_format: Optional[Dict[str, Any]] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    reasoning_level: Optional[str] = None
+    cancel_event: Optional[Any] = None
 
 
 @dataclass
@@ -82,6 +93,8 @@ class CompletionResponse:
 class EmbeddingRequest:
     input: str
     model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
 
 
 @dataclass

@@ -2,7 +2,7 @@ import logging
 import asyncio
 import traceback
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 
 from app.core.database import db_manager
@@ -10,7 +10,7 @@ from app.infrastructure.memory_db import memory_db
 from app.core.event_bus import event_bus, SystemEvent
 from app.services.state_machine import WorkflowStateMachine, WorkflowState
 from app.services.worker import TaskQueue
-from app.infrastructure.db.models import Workflow, WorkflowExecution, TaskLog, Step
+from app.infrastructure.db.models import Workflow, WorkflowExecution, TaskLog, Step, ChatMessage
 from app.recovery import recovery_engine, RecoveryStrategy
 from app.verification import verification_engine
 from app.ai.capabilities import capability_registry
@@ -80,8 +80,9 @@ class WorkflowEngine:
         event_bus.subscribe("task.completed", self._handle_step_completed)
         event_bus.subscribe("task.failed", self._handle_step_failed)
         event_bus.subscribe("verification.failed", self._handle_verification_failed)
+        event_bus.subscribe("workflow.state_change", self._handle_state_change)
 
-    async def start_execution(self, workflow, user_id) -> str:
+    async def start_execution(self, workflow, user_id, conversation_id: Optional[str] = None) -> str:
         if not (isinstance(workflow, dict) or hasattr(workflow, 'id')):
             workflow_obj = await Workflow.get(workflow)
             if not workflow_obj:
@@ -91,22 +92,36 @@ class WorkflowEngine:
         wf_title = workflow.title if hasattr(workflow, 'title') else (workflow.get("title", "") if isinstance(workflow, dict) else "")
         wf_desc = workflow.description if hasattr(workflow, 'description') else (workflow.get("description", "") if isinstance(workflow, dict) else "")
         steps_list = _get_steps(workflow)
+        steps_dicts = []
+        for s in steps_list:
+            if hasattr(s, 'model_dump'):
+                steps_dicts.append(s.model_dump())
+            elif isinstance(s, dict):
+                steps_dicts.append(s)
+            else:
+                steps_dicts.append({"step_id": str(getattr(s, 'step_id', '')), "name": str(getattr(s, 'name', '')), "agent_type": str(getattr(s, 'agent_type', '')), "action": str(getattr(s, 'action', ''))})
         total_steps = len(steps_list)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if db_manager.use_memory:
             exec_doc = {
                 "workflow_id": str(workflow.id),
                 "user_id": str(user_id),
+                "conversation_id": conversation_id,
                 "title": wf_title,
                 "description": wf_desc,
+                "steps": steps_dicts,
                 "status": WorkflowState.IDLE.value,
                 "current_step_index": 0,
                 "total_steps": total_steps,
                 "started_at": now.isoformat(),
                 "completed_at": None,
+                "stopped_at": None,
                 "error_message": None,
                 "result": None,
+                "result_type": None,
+                "last_completed_step": None,
+                "partial_result": None,
                 "created_at": now.isoformat()
             }
             oid = await memory_db.insert("workflow_executions", exec_doc)
@@ -115,15 +130,21 @@ class WorkflowEngine:
             execution = WorkflowExecution(
                 workflow_id=workflow.id,
                 user_id=user_id,
+                conversation_id=conversation_id,
                 title=wf_title,
                 description=wf_desc,
+                steps=steps_dicts,
                 status=WorkflowState.IDLE.value,
                 current_step_index=0,
                 total_steps=total_steps,
                 started_at=now,
                 completed_at=None,
+                stopped_at=None,
                 error_message=None,
                 result=None,
+                result_type=None,
+                last_completed_step=None,
+                partial_result=None,
             )
             await execution.insert()
             execution_id = str(execution.id)
@@ -140,9 +161,9 @@ class WorkflowEngine:
 
     async def abort_execution(self, execution_id: str) -> None:
         await WorkflowStateMachine.transition_to(execution_id, WorkflowState.STOPPING)
-        logger.info(f"Execution {execution_id} requested cancellation.")
-        # Immediately cancel any running task
-        await WorkflowStateMachine.transition_to(execution_id, WorkflowState.CANCELLED)
+        logger.info(f"Execution {execution_id} requested cancellation (STOPPING).")
+        # The worker's _periodic_cancel_check will observe STOPPING,
+        # kill the process tree, and transition to CANCELLED.
 
     async def _dispatch_next_step(self, execution_id: str, workflow=None) -> None:
         exec_doc = await _find_exec(execution_id)
@@ -237,9 +258,14 @@ class WorkflowEngine:
                     "status": "success",
                     "logs": f"Step completed successfully. Result details: {result}"
                 })
-                update_fields = {"current_step_index": step_idx + 1}
+                step_name = _get_step_attr(step, "name", "")
+                update_fields = {
+                    "current_step_index": step_idx + 1,
+                    "last_completed_step": f"Step {step_idx + 1} — {step_name}" if step_name else f"Step {step_idx + 1}",
+                }
                 if result_text:
                     update_fields["result"] = result_text
+                    update_fields["partial_result"] = result_text
                 update_ok = await memory_db.update("workflow_executions", {"_id": ObjectId(execution_id)}, update_fields)
                 logger.info(f"[WorkflowEngine] memory_db update result={update_ok}, new_step_index={step_idx + 1}, exec_id={execution_id}")
             else:
@@ -256,8 +282,11 @@ class WorkflowEngine:
                 exec_model = await WorkflowExecution.get(ObjectId(execution_id))
                 if exec_model:
                     exec_model.current_step_index += 1
+                    step_name = _get_step_attr(step, "name", "")
+                    exec_model.last_completed_step = f"Step {step_idx + 1} — {step_name}" if step_name else f"Step {step_idx + 1}"
                     if result_text:
                         exec_model.result = result_text
+                        exec_model.partial_result = result_text
                     await exec_model.save()
 
             logger.info(f"[WorkflowEngine] Step {step_idx} completed. Dispatching next step...")
@@ -402,5 +431,92 @@ class WorkflowEngine:
             metadata={"error_details": error_details} if error_details else None,
         )
         logger.error(f"Workflow execution {execution_id} halted on step failure: {error_msg}")
+
+    async def _handle_state_change(self, event: SystemEvent) -> None:
+        """Save a conversation message when a workflow reaches a terminal state.
+
+        Idempotent: checks for an existing message with the same execution_id
+        and workflow_state before inserting, so reconnects or repeated events
+        cannot create duplicate completion or stopped messages.
+        """
+        payload = event.payload
+        new_state = payload.get("new_state", "")
+        if new_state not in ("Completed", "Failed", "Cancelled"):
+            return
+
+        execution_id = payload.get("execution_id", "")
+        exec_doc = await _find_exec(execution_id)
+        if not exec_doc:
+            return
+
+        conversation_id = exec_doc.get("conversation_id")
+        user_id = exec_doc.get("user_id")
+        if not conversation_id or not user_id:
+            return
+
+        # Idempotency check: skip if a message for this execution_id + state already exists
+        if db_manager.use_memory:
+            existing = await memory_db.find("chat_messages", {
+                "user_id": str(user_id),
+                "conversation_id": conversation_id,
+                "execution_id": execution_id,
+                "metadata.workflow_state": new_state,
+            })
+            if existing:
+                logger.info(f"Skipping duplicate {new_state} message for execution {execution_id}")
+                return
+        else:
+            existing = await ChatMessage.find(
+                ChatMessage.user_id == user_id,
+                ChatMessage.conversation_id == conversation_id,
+                ChatMessage.execution_id == execution_id,
+            ).to_list()
+            for msg in existing:
+                if (msg.metadata or {}).get("workflow_state") == new_state:
+                    logger.info(f"Skipping duplicate {new_state} message for execution {execution_id}")
+                    return
+
+        title = exec_doc.get("title", "Task")
+        last_step = exec_doc.get("last_completed_step", "")
+        error_msg = exec_doc.get("error_message", "")
+        result_text = exec_doc.get("result", "") or exec_doc.get("partial_result", "")
+
+        if new_state == "Completed":
+            content = f"Workflow completed: {title}"
+            if result_text:
+                content += f"\n\nResult:\n{result_text}"
+            message_type = "assistant"
+        elif new_state == "Failed":
+            content = f"Workflow failed: {title}"
+            if error_msg:
+                content += f"\n\nError: {error_msg}"
+            if last_step:
+                content += f"\n\nLast step: {last_step}"
+            message_type = "error"
+        elif new_state == "Cancelled":
+            content = f"Workflow stopped: {title}"
+            if last_step:
+                content += f"\n\nStopped during: {last_step}"
+            else:
+                content += "\n\nThe task was stopped by the user."
+            message_type = "assistant"
+        else:
+            return
+
+        try:
+            msg = ChatMessage(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                role="assistant",
+                message_type=message_type,
+                content=content,
+                execution_id=execution_id,
+                metadata={"workflow_state": new_state, "execution_id": execution_id},
+            )
+            await msg.insert()
+            logger.info(f"Saved {new_state} message for execution {execution_id} in conversation {conversation_id}")
+        except Exception as e:
+            logger.error(f"Failed to save workflow result message: {e}")
+
 
 workflow_engine = WorkflowEngine()

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, workflows, executions, permissions, search, plugins, providers, dashboard, cloud, settings
+from app.api.v1 import auth, workflows, executions, permissions, search, plugins, providers, dashboard, cloud, settings, ai
 
 api_router = APIRouter()
 
@@ -13,3 +13,4 @@ api_router.include_router(providers.router, prefix="/providers", tags=["provider
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(cloud.router, prefix="/cloud", tags=["cloud"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+api_router.include_router(ai.router, prefix="/ai", tags=["ai"])

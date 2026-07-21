@@ -66,7 +66,7 @@ class RecoveryEngine:
 
         # Check if this is a destructive action that should not be retried
         is_destructive = self._is_destructive_action(agent_type, action, params)
-        if is_destructive and attempt > 1:
+        if is_destructive and attempt >= 1:
             logger.warning(f"Destructive action {agent_type}/{action} failed, not retrying (attempt {attempt})")
             return RecoveryAction(
                 strategy=RecoveryStrategy.ABORT,

@@ -147,4 +147,5 @@ class TestWorkflowEngineCancellation:
         await workflow_engine.abort_execution(str(oid))
 
         status = await WorkflowStateMachine.get_status(str(oid))
-        assert status == WorkflowState.CANCELLED.value
+        # C3 fix: abort now sets STOPPING (worker transitions to CANCELLED)
+        assert status == WorkflowState.STOPPING.value

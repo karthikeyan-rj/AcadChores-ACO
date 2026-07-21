@@ -1,7 +1,7 @@
 import os
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from bson import ObjectId
 
@@ -81,13 +81,13 @@ class FileIndexer:
             "files_updated": 0,
             "files_removed": 0,
             "errors": [],
-            "started_at": datetime.utcnow().isoformat() if db_manager.use_memory else datetime.utcnow(),
+            "started_at": datetime.now(timezone.utc).isoformat() if db_manager.use_memory else datetime.now(timezone.utc),
         }
 
         if db_manager.use_memory:
             job_id = await memory_db.insert("index_jobs", job_data)
         else:
-            job = IndexJob(user_id=user_oid, status="running", roots=roots, started_at=datetime.utcnow())
+            job = IndexJob(user_id=user_oid, status="running", roots=roots, started_at=datetime.now(timezone.utc))
             await job.insert()
             job_id = job.id
 
@@ -118,12 +118,12 @@ class FileIndexer:
                                     existing["extension"] = fm["extension"]
                                     existing["size_bytes"] = fm["size_bytes"]
                                     existing["modified_at"] = fm["modified_at"].isoformat()
-                                    existing["last_indexed_at"] = datetime.utcnow().isoformat()
+                                    existing["last_indexed_at"] = datetime.now(timezone.utc).isoformat()
                                     job_data["files_updated"] += 1
                             else:
                                 fm["user_id"] = str(user_oid)
                                 fm["modified_at"] = fm["modified_at"].isoformat()
-                                fm["last_indexed_at"] = datetime.utcnow().isoformat()
+                                fm["last_indexed_at"] = datetime.now(timezone.utc).isoformat()
                                 await memory_db.insert("file_index", fm)
                                 job_data["files_indexed"] += 1
                         else:
@@ -137,7 +137,7 @@ class FileIndexer:
                                     existing.extension = fm["extension"]
                                     existing.size_bytes = fm["size_bytes"]
                                     existing.modified_at = fm["modified_at"]
-                                    existing.last_indexed_at = datetime.utcnow()
+                                    existing.last_indexed_at = datetime.now(timezone.utc)
                                     await existing.save()
                                     job_data["files_updated"] += 1
                             else:
@@ -148,7 +148,7 @@ class FileIndexer:
                                     size_bytes=fm["size_bytes"],
                                     modified_at=fm["modified_at"],
                                     user_id=user_oid,
-                                    last_indexed_at=datetime.utcnow()
+                                    last_indexed_at=datetime.now(timezone.utc)
                                 )
                                 await file_doc.insert()
                                 job_data["files_indexed"] += 1
@@ -174,11 +174,11 @@ class FileIndexer:
 
             job_data["status"] = "completed"
             job_data["errors"] = errors
-            job_data["completed_at"] = datetime.utcnow().isoformat() if db_manager.use_memory else datetime.utcnow()
+            job_data["completed_at"] = datetime.now(timezone.utc).isoformat() if db_manager.use_memory else datetime.now(timezone.utc)
         except Exception as e:
             job_data["status"] = "failed"
             job_data["errors"] = errors + [str(e)]
-            job_data["completed_at"] = datetime.utcnow().isoformat() if db_manager.use_memory else datetime.utcnow()
+            job_data["completed_at"] = datetime.now(timezone.utc).isoformat() if db_manager.use_memory else datetime.now(timezone.utc)
             logger.error(f"Index job failed for user {user_id_str}: {e}")
 
         if db_manager.use_memory:

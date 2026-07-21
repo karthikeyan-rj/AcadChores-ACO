@@ -24,11 +24,11 @@ interface WorkflowGraphProps {
 }
 
 const agentConfig: Record<string, { icon: React.ComponentType<any>; color: string; label: string }> = {
-  browser: { icon: Globe, color: 'text-blue-400', label: 'Browser' },
-  terminal: { icon: Terminal, color: 'text-green-400', label: 'Terminal' },
-  desktop: { icon: Monitor, color: 'text-purple-400', label: 'Desktop' },
-  file: { icon: FileText, color: 'text-amber-400', label: 'File' },
-  vision: { icon: Eye, color: 'text-cyan-400', label: 'Vision' },
+  browser: { icon: Globe, color: 'text-status-info', label: 'Browser' },
+  terminal: { icon: Terminal, color: 'text-status-active', label: 'Terminal' },
+  desktop: { icon: Monitor, color: 'text-theme-secondary', label: 'Desktop' },
+  file: { icon: FileText, color: 'text-status-warning', label: 'File' },
+  vision: { icon: Eye, color: 'text-status-info', label: 'Vision' },
 };
 
 function getStepStatus(idx: number, activeStepIndex: number): 'completed' | 'running' | 'failed' | 'pending' {
@@ -43,10 +43,9 @@ export function WorkflowGraph({ steps, activeStepIndex, onStepClick, selectedSte
 
   return (
     <div className="space-y-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#71717A] px-1">Workflow Plan</h3>
+      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-theme-tertiary px-1">Workflow Plan</h3>
       <div className="relative">
-        {/* Vertical connector line */}
-        <div className="absolute left-[19px] top-0 bottom-0 w-px bg-white/[0.07]" />
+        <div className="absolute left-[19px] top-0 bottom-0 w-px bg-theme" />
 
         <AnimatePresence mode="wait">
           {steps.map((step, idx) => {
@@ -67,38 +66,36 @@ export function WorkflowGraph({ steps, activeStepIndex, onStepClick, selectedSte
                   isSelected && 'z-10'
                 )}
               >
-                {/* Node circle */}
                 <div className={cn(
                   'relative z-10 w-[38px] h-[38px] rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-300',
-                  status === 'completed' && 'bg-[#4ADE80]/10 border-[#4ADE80]/50',
-                  status === 'running' && 'bg-[#ADFF2F]/10 border-[#ADFF2F]/50 animate-pulse-slow',
-                  status === 'failed' && 'bg-[#F87171]/10 border-[#F87171]/50',
-                  status === 'pending' && 'bg-[#0D0F12] border-white/[0.07]',
-                  isSelected && 'ring-2 ring-[#7C3AED]/30 ring-offset-2 ring-offset-[#08090B]'
+                  status === 'completed' && 'bg-status-active-soft border-status-active/50',
+                  status === 'running' && 'bg-surface-2 border-text-primary/50 animate-pulse',
+                  status === 'failed' && 'bg-status-error-soft border-status-error/50',
+                  status === 'pending' && 'bg-surface border-theme',
+                  isSelected && 'ring-2 ring-text-primary/20 ring-offset-2 ring-offset-surface'
                 )}>
                   {status === 'completed' ? (
-                    <CheckCircle2 size={16} className="text-[#4ADE80]" />
+                    <CheckCircle2 size={16} className="text-status-active" />
                   ) : status === 'running' ? (
-                    <Loader2 size={16} className="text-[#ADFF2F] animate-spin" />
+                    <Loader2 size={16} className="text-text-primary animate-spin" />
                   ) : status === 'failed' ? (
-                    <XCircle size={16} className="text-[#F87171]" />
+                    <XCircle size={16} className="text-status-error" />
                   ) : (
                     <AgentIcon size={14} className={cn(config.color, 'opacity-50')} />
                   )}
                 </div>
 
-                {/* Content card */}
                 <div className={cn(
-                  'flex-1 rounded-[10px] border p-3 transition-all duration-200',
-                  isSelected ? 'bg-[#7C3AED]/5 border-[#7C3AED]/30' : 'bg-[#121419] border-white/[0.07] group-hover:border-white/[0.12]'
+                  'flex-1 rounded-xl border p-3 transition-all duration-200',
+                  isSelected ? 'bg-surface-2 border-theme-strong' : 'bg-surface border-theme group-hover:border-theme-strong'
                 )}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-[#F4F4F5] truncate pr-2">{step.name}</span>
+                    <span className="text-xs font-semibold text-theme truncate pr-2">{step.name}</span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {onStepReplay && (status === 'completed' || status === 'failed') && (
                         <button
                           onClick={(e) => { e.stopPropagation(); onStepReplay(step); }}
-                          className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-[#7C3AED]/10 text-[#71717A] hover:text-[#7C3AED] transition-all cursor-pointer"
+                          className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-surface-hover text-theme-tertiary hover:text-theme transition-all cursor-pointer"
                           title="Replay this step"
                         >
                           <RotateCcw size={12} />
@@ -106,16 +103,16 @@ export function WorkflowGraph({ steps, activeStepIndex, onStepClick, selectedSte
                       )}
                       <span className={cn(
                         'text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase',
-                        status === 'completed' && 'bg-[#4ADE80]/10 text-[#4ADE80]',
-                        status === 'running' && 'bg-[#ADFF2F]/10 text-[#ADFF2F]',
-                        status === 'failed' && 'bg-[#F87171]/10 text-[#F87171]',
-                        status === 'pending' && 'bg-[#0D0F12] text-[#71717A]'
+                        status === 'completed' && 'bg-status-active-soft text-status-active',
+                        status === 'running' && 'bg-surface-2 text-text-primary',
+                        status === 'failed' && 'bg-status-error-soft text-status-error',
+                        status === 'pending' && 'bg-surface-2 text-theme-tertiary'
                       )}>
                         {config.label}
                       </span>
                     </div>
                   </div>
-                  <p className="text-[10px] text-[#71717A]">
+                  <p className="text-[10px] text-theme-secondary">
                     {step.action}
                   </p>
                 </div>

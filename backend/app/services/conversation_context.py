@@ -46,10 +46,6 @@ _REFERENCE_PATTERNS_SORTED = sorted(REFERENCE_PATTERNS.keys(), key=len, reverse=
 
 # Patterns to extract entities from task results
 FILE_PATH_PATTERN = re.compile(r'[A-Z]:\\[^\s"\'<>:|*?]+|[~]/[^\s"\'<>:|*?]+|/[a-zA-Z][^\s"\'<>:|*?]+')
-DELETED_PATTERN = re.compile(r'deleted|removed|erased', re.IGNORECASE)
-CREATED_PATTERN = re.compile(r'created|saved|written|file saved', re.IGNORECASE)
-MOVED_PATTERN = re.compile(r'moved|copied', re.IGNORECASE)
-RENAMED_PATTERN = re.compile(r'renamed', re.IGNORECASE)
 
 
 def build_entity_context(messages: List[dict]) -> Dict[str, Any]:
@@ -64,6 +60,9 @@ def build_entity_context(messages: List[dict]) -> Dict[str, Any]:
     - last_task_description: description of the last workflow
     - last_workflow_id: ID of the last workflow
     - active_workflow_id: ID of the currently active workflow (if any)
+    - last_workflow_result: result of the most recent workflow
+    - last_workflow_state: state of the most recent workflow
+    - last_stop_reason: reason the last workflow was stopped
     """
     entities: Dict[str, Any] = {
         "last_created_file": None,
@@ -75,12 +74,29 @@ def build_entity_context(messages: List[dict]) -> Dict[str, Any]:
         "last_task_description": None,
         "last_workflow_id": None,
         "active_workflow_id": None,
+        "last_workflow_result": None,
+        "last_workflow_state": None,
+        "last_stop_reason": None,
     }
 
     for msg in messages:
         content = msg.get("content", "")
         msg_type = msg.get("message_type", "")
         metadata = msg.get("metadata", {}) or {}
+        execution_id = msg.get("execution_id")
+        workflow_state = metadata.get("workflow_state")
+
+        # Track active workflow from execution_id in messages
+        if execution_id and workflow_state in (None, "Planning", "Executing", "Waiting", "Retry", "Stopping"):
+            entities["active_workflow_id"] = execution_id
+
+        # Track completed/stopped/failed workflow results
+        if workflow_state in ("Completed", "Failed", "Cancelled"):
+            entities["last_workflow_state"] = workflow_state
+            entities["last_workflow_result"] = content[:500]
+            if workflow_state == "Cancelled":
+                entities["last_stop_reason"] = content[:300]
+            entities["active_workflow_id"] = None
 
         # Extract file paths from content
         paths = FILE_PATH_PATTERN.findall(content)
@@ -99,41 +115,40 @@ def build_entity_context(messages: List[dict]) -> Dict[str, Any]:
                 entities["last_workflow_id"] = wf_id
             entities["last_task_description"] = content[:200]
 
-        # Extract entities from task completion results
+        # Extract entities from task completion results (use dict keys directly
+        # instead of regex on str(task_results) which doubles backslashes)
         if task_results:
-            result_text = str(task_results)
-            if DELETED_PATTERN.search(result_text):
-                # Extract the deleted path
-                deleted_paths = FILE_PATH_PATTERN.findall(result_text)
-                if deleted_paths:
-                    entities["last_deleted_file"] = deleted_paths[-1]
-                    entities["last_file"] = deleted_paths[-1]
-                elif task_results.get("path"):
-                    entities["last_deleted_file"] = task_results["path"]
-                    entities["last_file"] = task_results["path"]
+            if task_results.get("deleted"):
+                path = task_results.get("path")
+                if path:
+                    entities["last_deleted_file"] = path
+                    entities["last_file"] = path
 
-            if CREATED_PATTERN.search(result_text):
-                created_paths = FILE_PATH_PATTERN.findall(result_text)
-                if created_paths:
-                    entities["last_created_file"] = created_paths[-1]
-                    entities["last_file"] = created_paths[-1]
-                elif task_results.get("path"):
-                    entities["last_created_file"] = task_results["path"]
-                    entities["last_file"] = task_results["path"]
+            if task_results.get("created") or (task_results.get("path") and not task_results.get("deleted")):
+                path = task_results.get("path")
+                if path:
+                    entities["last_created_file"] = path
+                    entities["last_file"] = path
 
-            if MOVED_PATTERN.search(result_text):
-                if task_results.get("source"):
-                    entities["last_moved_file"] = task_results["source"]
-                    entities["last_file"] = task_results["source"]
-                if task_results.get("destination"):
-                    entities["last_destination_folder"] = task_results["destination"]
+            if task_results.get("moved"):
+                source = task_results.get("source")
+                if source:
+                    entities["last_moved_file"] = source
+                    entities["last_file"] = source
+                destination = task_results.get("destination")
+                if destination:
+                    entities["last_destination_folder"] = destination
 
-            if RENAMED_PATTERN.search(result_text):
-                if task_results.get("old_path") or task_results.get("path"):
-                    entities["last_modified_file"] = task_results.get("old_path") or task_results.get("path")
-                    entities["last_file"] = entities["last_modified_file"]
+            if task_results.get("renamed"):
+                old_path = task_results.get("old_path") or task_results.get("path")
+                if old_path:
+                    entities["last_modified_file"] = old_path
+                    entities["last_file"] = old_path
 
-        # Also scan plain content for file creation/deletion patterns
+        # Scan plain content for file creation/deletion patterns.
+        # Also scan assistant messages that report actual results (e.g. "File saved: C:\...")
+        is_user_message = msg_type in ("user", "") or msg.get("role") == "user"
+        has_task_results = bool(task_results)
         if "file saved:" in content.lower() or "created" in content.lower():
             for p in paths:
                 entities["last_created_file"] = p
@@ -215,6 +230,20 @@ def build_context_summary(entities: Dict[str, Any], recent_messages: List[dict])
         lines.append(f"Last renamed file: {entities['last_modified_file']}")
     if entities.get("last_task_description"):
         lines.append(f"Last task: {entities['last_task_description'][:100]}")
+
+    if entities.get("active_workflow_id"):
+        lines.append(f"Active workflow: {entities['active_workflow_id']}")
+
+    if entities.get("last_workflow_state"):
+        state = entities["last_workflow_state"]
+        result = entities.get("last_workflow_result", "")
+        if state == "Completed" and result:
+            lines.append(f"Last workflow completed successfully. Result: {result[:200]}")
+        elif state == "Failed" and result:
+            lines.append(f"Last workflow failed. Error: {result[:200]}")
+        elif state == "Cancelled":
+            reason = entities.get("last_stop_reason", "")
+            lines.append(f"Last workflow was stopped by the user. Reason: {reason[:200] if reason else 'No reason given'}")
 
     if recent_messages:
         lines.append("\nRecent conversation:")

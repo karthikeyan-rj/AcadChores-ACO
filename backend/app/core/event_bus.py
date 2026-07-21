@@ -3,7 +3,7 @@ import logging
 import asyncio
 from typing import Callable, Dict, List, Any, Optional
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from app.core.database import db_manager
 
@@ -14,7 +14,7 @@ class SystemEvent(BaseModel):
     topic: str
     sender: str
     payload: Dict[str, Any] = {}
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class EventBus:
     def __init__(self):

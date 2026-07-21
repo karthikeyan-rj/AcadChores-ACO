@@ -1,15 +1,20 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Send, X } from 'lucide-react';
+import { X, Mail } from 'lucide-react';
+
+interface EmailDraft {
+  type: string;
+  to?: string;
+  subject?: string;
+  body?: string;
+  message?: string;
+}
 
 interface EmailDraftModalProps {
-  draft: {
-    to: string;
-    subject: string;
-    body: string;
-  } | null;
+  draft: EmailDraft | null;
   editedSubject: string;
   editedBody: string;
   onSubjectChange: (v: string) => void;
@@ -19,76 +24,79 @@ interface EmailDraftModalProps {
 }
 
 export function EmailDraftModal({ draft, editedSubject, editedBody, onSubjectChange, onBodyChange, onConfirm, onReject }: EmailDraftModalProps) {
-  if (!draft) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!draft || !mounted) return null;
 
-  return (
-    <AnimatePresence>
+  return createPortal(
+    <AnimatePresence mode="wait">
       <motion.div
+        key="email-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+        transition={{ duration: 0.12 }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        onClick={onReject}
       >
         <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-[#121419] border border-white/[0.07] rounded-lg w-full max-w-lg overflow-hidden shadow-matte-lg"
+          key="email-dialog"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 6 }}
+          transition={{ duration: 0.12 }}
+          className="w-[460px] bg-surface border border-theme-strong rounded-xl overflow-hidden shadow-theme-lg"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/20 flex items-center justify-center">
-                <Mail size={20} className="text-[#7C3AED]" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm text-[#F4F4F5]">Review Email Draft</h3>
-                <p className="text-[11px] text-[#A1A1AA]">AI generated the body — edit if needed, then confirm</p>
-              </div>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
+            <div className="flex items-center gap-2">
+              <Mail size={16} className="text-status-info" />
+              <h3 className="text-[13px] font-semibold text-theme">Review Email</h3>
             </div>
-
-            <div className="bg-[#0D0F12] rounded-xl p-4 border border-white/[0.07] space-y-3 mb-5">
+            <button onClick={onReject} className="p-1 rounded-md hover:bg-surface-hover text-theme-tertiary cursor-pointer">
+              <X size={14} />
+            </button>
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            {draft.to && (
               <div>
-                <label className="text-[10px] text-[#71717A] uppercase font-semibold tracking-wider">To</label>
-                <p className="text-xs text-[#F4F4F5] font-mono bg-[#08090B] p-2 rounded border border-white/[0.07] mt-1">{draft.to}</p>
+                <label className="text-[10px] font-semibold text-theme-tertiary uppercase tracking-wider">To</label>
+                <p className="text-[12px] text-theme mt-0.5">{draft.to}</p>
               </div>
-              <div>
-                <label className="text-[10px] text-[#71717A] uppercase font-semibold tracking-wider">Subject</label>
-                <input
-                  type="text"
-                  value={editedSubject}
-                  onChange={(e) => onSubjectChange(e.target.value)}
-                  className="w-full text-xs text-[#F4F4F5] font-mono bg-[#08090B] p-2 rounded border border-white/[0.07] mt-1 outline-none focus:border-[#7C3AED] transition"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-[#71717A] uppercase font-semibold tracking-wider">Body</label>
-                <textarea
-                  value={editedBody}
-                  onChange={(e) => onBodyChange(e.target.value)}
-                  rows={6}
-                  className="w-full text-xs text-[#F4F4F5] font-mono bg-[#08090B] p-2 rounded border border-white/[0.07] mt-1 outline-none focus:border-[#7C3AED] transition resize-none"
-                />
-              </div>
+            )}
+            <div>
+              <label className="text-[10px] font-semibold text-theme-tertiary uppercase tracking-wider">Subject</label>
+              <input
+                type="text"
+                value={editedSubject}
+                onChange={(e) => onSubjectChange(e.target.value)}
+                className="w-full mt-1 px-3 py-2 text-[12px] bg-input border border-theme-strong rounded-lg text-theme outline-none focus:border-theme-tertiary transition"
+              />
             </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={onReject}
-                className="flex-1 bg-[#F87171]/10 hover:bg-[#F87171]/20 text-[#F87171] font-semibold py-2.5 px-4 rounded-lg border border-[#F87171]/20 transition text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onConfirm}
-                className="flex-1 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold py-2.5 px-4 rounded-lg shadow-matte transition text-xs cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Send size={13} />
-                Send Email
-              </button>
+            <div>
+              <label className="text-[10px] font-semibold text-theme-tertiary uppercase tracking-wider">Body</label>
+              <textarea
+                value={editedBody}
+                onChange={(e) => onBodyChange(e.target.value)}
+                rows={6}
+                className="w-full mt-1 px-3 py-2 text-[12px] bg-input border border-theme-strong rounded-lg text-theme outline-none focus:border-theme-tertiary transition resize-none leading-relaxed"
+              />
             </div>
+          </div>
+          <div className="flex gap-2 px-4 py-3 border-t border-theme">
+            <button onClick={onReject}
+              className="flex-1 text-[12px] font-semibold py-2 rounded-lg bg-surface hover:bg-surface-hover text-theme-secondary border border-theme-strong transition cursor-pointer">
+              Cancel
+            </button>
+            <button onClick={onConfirm}
+              className="flex-1 text-[12px] font-semibold py-2 rounded-lg bg-text-primary text-text-inverse border border-text-primary transition cursor-pointer hover:opacity-90">
+              Send Email
+            </button>
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

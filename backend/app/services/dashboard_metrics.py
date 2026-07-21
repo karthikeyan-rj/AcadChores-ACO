@@ -3,7 +3,7 @@ import time
 import platform
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 
 from app.core.database import db_manager
@@ -161,7 +161,7 @@ class DashboardMetricsService:
 
     async def _today_metrics(self, m: Dict[str, Any], user_id: str) -> None:
         execs = await self._get_user_executions(user_id)
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         completed_today = 0
         failed_today = 0
         for e in execs:

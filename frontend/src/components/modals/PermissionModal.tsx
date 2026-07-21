@@ -3,62 +3,71 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert } from 'lucide-react';
+import { Shield, Check, X } from 'lucide-react';
 
 interface PermissionModalProps {
-  permission: {
-    request_id: string;
-    agent_name: string;
-    action: string;
-    details: any;
-  } | null;
+  permission: any;
   onDecision: (approved: boolean) => void;
 }
 
 export function PermissionModal({ permission, onDecision }: PermissionModalProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-
   if (!permission || !mounted) return null;
-
-  const detail = permission.details || {};
-  const summary = detail.path || detail.file_path || detail.command || detail.url || JSON.stringify(detail).substring(0, 60);
 
   return createPortal(
     <AnimatePresence mode="wait">
       <motion.div
-        key={permission.request_id}
-        initial={{ x: 400, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: 400, opacity: 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed top-4 right-4 z-[9999] w-[320px]"
+        key="perm-overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.12 }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        onClick={() => onDecision(false)}
       >
-        <div className="bg-[#121419] border border-[#FBBF24]/30 rounded-lg shadow-matte-lg overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.07]">
-            <ShieldAlert size={14} className="text-[#FBBF24] shrink-0" />
-            <span className="text-[11px] font-semibold text-[#F4F4F5] truncate">
-              {permission.agent_name} — {permission.action}
-            </span>
+        <motion.div
+          key="perm-dialog"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 6 }}
+          transition={{ duration: 0.12 }}
+          className="w-[380px] bg-surface border border-theme-strong rounded-xl overflow-hidden shadow-theme-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b border-theme">
+            <div className="w-8 h-8 rounded-lg bg-status-warning-soft flex items-center justify-center shrink-0">
+              <Shield size={16} className="text-status-warning" />
+            </div>
+            <div>
+              <h3 className="text-[13px] font-semibold text-theme">Permission Required</h3>
+              <p className="text-[10px] text-theme-tertiary">ACO needs your approval to proceed.</p>
+            </div>
           </div>
-          <div className="px-3 py-2">
-            <p className="text-[10px] text-[#A1A1AA] truncate">{summary}</p>
+          <div className="px-4 py-3">
+            <div className="p-3 rounded-lg bg-surface-2 border border-theme">
+              <p className="text-[12px] font-medium text-theme">{permission.action || 'Unknown action'}</p>
+              {permission.details && (
+                <p className="text-[11px] text-theme-secondary mt-1 font-mono break-all">{permission.details}</p>
+              )}
+            </div>
           </div>
-          <div className="flex gap-2 px-3 pb-2.5">
+          <div className="flex gap-2 px-4 py-3 border-t border-theme">
             <button
               onClick={() => onDecision(false)}
-              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-[#F87171]/10 hover:bg-[#F87171]/20 text-[#F87171] border border-[#F87171]/20 transition cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-1.5 text-[12px] font-semibold py-2 rounded-lg bg-surface hover:bg-surface-hover text-theme-secondary border border-theme-strong transition cursor-pointer"
             >
-              Block
+              <X size={12} /> Deny
             </button>
             <button
               onClick={() => onDecision(true)}
-              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-matte transition cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-1.5 text-[12px] font-semibold py-2 rounded-lg bg-text-primary text-text-inverse border border-text-primary transition cursor-pointer hover:opacity-90"
             >
-              Allow
+              <Check size={12} /> Approve
             </button>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>,
     document.body

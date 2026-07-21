@@ -1,94 +1,60 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        background: '#08090B',
-        foreground: '#F4F4F5',
-        card: {
-          DEFAULT: '#121419',
-          hover: '#181B21',
+        app: 'var(--app-background)',
+        surface: {
+          DEFAULT: 'var(--surface-primary)',
+          2: 'var(--surface-secondary)',
+          elevated: 'var(--surface-elevated)',
+          hover: 'var(--surface-hover)',
+          active: 'var(--surface-active)',
         },
         border: {
-          DEFAULT: 'rgba(255,255,255,0.07)',
-          light: 'rgba(255,255,255,0.12)',
-          strong: 'rgba(255,255,255,0.15)',
+          DEFAULT: 'var(--border-primary)',
+          strong: 'var(--border-strong)',
         },
-        primary: {
-          DEFAULT: '#7C3AED',
-          hover: '#6D28D9',
-          muted: 'rgba(124,58,237,0.12)',
-          glow: 'rgba(124,58,237,0.25)',
-        },
-        accent: {
-          DEFAULT: '#ADFF2F',
-          muted: 'rgba(173,255,47,0.08)',
-          dim: 'rgba(173,255,47,0.15)',
-        },
-        success: '#4ADE80',
-        warning: '#FBBF24',
-        danger: {
-          DEFAULT: '#F87171',
-          muted: 'rgba(248,113,113,0.1)',
-        },
-        surface: {
-          DEFAULT: '#0D0F12',
-          2: '#121419',
-          3: '#181B21',
-          4: '#1E2128',
-        },
-        muted: '#71717A',
-        'text-secondary': '#A1A1AA',
+        muted: 'var(--text-secondary)',
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'text-tertiary': 'var(--text-tertiary)',
+        'text-inverse': 'var(--text-inverse)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
-        display: ['Inter', 'system-ui', 'sans-serif'],
-      },
-      fontSize: {
-        '2xs': ['0.65rem', { lineHeight: '0.9rem' }],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        mono: ['SFMono-Regular', 'SF Mono', 'Roboto Mono', 'Consolas', 'monospace'],
+        display: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
-        'sm': '6px',
+        'sm': '8px',
         'md': '10px',
-        'lg': '14px',
-        'xl': '18px',
-      },
-      boxShadow: {
-        'matte': '0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)',
-        'matte-md': '0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3)',
-        'matte-lg': '0 8px 24px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.3)',
-        'inner-glow': 'inset 0 1px 0 rgba(255,255,255,0.03)',
-        'violet-glow': '0 0 20px rgba(124,58,237,0.15)',
+        'lg': '12px',
+        'xl': '14px',
       },
       animation: {
-        'fade-in': 'fadeIn 0.2s ease-out',
-        'slide-up': 'slideUp 0.25s ease-out',
-        'pulse-slow': 'pulse 3s ease-in-out infinite',
-        'glow-line': 'glowLine 2s ease-in-out infinite',
+        'fade-in': 'fadeIn 0.15s ease-out',
+        'slide-up': 'slideUp 0.15s ease-out',
+        'pulse-slow': 'shimmer 2s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         slideUp: {
-          '0%': { transform: 'translateY(8px)', opacity: '0' },
+          '0%': { transform: 'translateY(4px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
-        pulse: {
+        shimmer: {
           '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.6' },
-        },
-        glowLine: {
-          '0%, 100%': { opacity: '0.3' },
-          '50%': { opacity: '0.8' },
+          '50%': { opacity: '0.5' },
         },
       },
     },

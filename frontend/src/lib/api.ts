@@ -45,6 +45,12 @@ async function apiFetch(path: string, opts: RequestInit = {}, token?: string | n
   return res.json();
 }
 
+export function apiFetchWithAbort(path: string, token?: string | null) {
+  const controller = new AbortController();
+  const promise = apiFetch(path, { signal: controller.signal as any }, token);
+  return { promise, abort: () => controller.abort() };
+}
+
 export const api = {
   health: () => fetch(`${BACKEND}/health`).then(r => r.ok),
 
@@ -70,11 +76,17 @@ export const api = {
   getConversation: (conversationId: string, token: string) =>
     apiFetch(`/api/v1/workflows/conversations/${conversationId}`, {}, token),
 
+  getConversationWorkflows: (conversationId: string, token: string) =>
+    apiFetch(`/api/v1/workflows/conversations/${conversationId}/workflows`, {}, token),
+
   createWorkflow: (title: string, description: string, steps: any[], token: string) =>
     apiFetch('/api/v1/workflows', { method: 'POST', body: JSON.stringify({ title, description, steps }) }, token),
 
-  executeWorkflow: (workflowId: string, token: string) =>
-    apiFetch(`/api/v1/workflows/${workflowId}/execute`, { method: 'POST' }, token),
+  executeWorkflow: (workflowId: string, token: string, conversationId?: string) =>
+    apiFetch(`/api/v1/workflows/${workflowId}/execute`, {
+      method: 'POST',
+      body: conversationId ? JSON.stringify({ conversation_id: conversationId }) : undefined,
+    }, token),
 
   getExecutions: (token: string) =>
     apiFetch('/api/v1/executions', {}, token),
@@ -164,6 +176,45 @@ export const api = {
 
   getSettingsApiKeys: (token: string) =>
     apiFetch('/api/v1/settings/api-keys', {}, token),
+
+  // AI provider, credential, model, and settings endpoints
+  getAIProviders: (token: string) =>
+    apiFetch('/api/v1/ai/providers', {}, token),
+
+  getAIModels: (token: string, providerId?: string) =>
+    apiFetch(`/api/v1/ai/models${providerId ? `?provider_id=${providerId}` : ''}`, {}, token),
+
+  getAICredentials: (token: string) =>
+    apiFetch('/api/v1/ai/credentials', {}, token),
+
+  saveAICredential: (provider: string, apiKey: string, label: string, isDefault: boolean, token: string) =>
+    apiFetch('/api/v1/ai/credentials', {
+      method: 'POST', body: JSON.stringify({ provider, api_key: apiKey, label, is_default: isDefault }),
+    }, token),
+
+  updateAICredential: (credentialId: string, data: Record<string, any>, token: string) =>
+    apiFetch(`/api/v1/ai/credentials/${credentialId}`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    }, token),
+
+  deleteAICredential: (credentialId: string, token: string) =>
+    apiFetch(`/api/v1/ai/credentials/${credentialId}`, { method: 'DELETE' }, token),
+
+  validateAICredential: (credentialId: string, token: string) =>
+    apiFetch(`/api/v1/ai/credentials/${credentialId}/validate`, { method: 'POST' }, token),
+
+  getAISettings: (token: string) =>
+    apiFetch('/api/v1/ai/settings', {}, token),
+
+  updateAISettings: (data: Record<string, any>, token: string) =>
+    apiFetch('/api/v1/ai/settings', {
+      method: 'PUT', body: JSON.stringify(data),
+    }, token),
+
+  setConversationModel: (conversationId: string, data: Record<string, any>, token: string) =>
+    apiFetch(`/api/v1/ai/conversations/${conversationId}/model-selection`, {
+      method: 'PUT', body: JSON.stringify(data),
+    }, token),
 
   wsUrl: (executionId: string, token: string | null) =>
     `${getWsUrl()}/ws/executions/${executionId}${token ? `?token=${encodeURIComponent(token)}` : ''}`,

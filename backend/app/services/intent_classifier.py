@@ -32,6 +32,12 @@ CLARIFICATION_PATTERNS = [
     (r'^(organize|sort|clean)\s*(up)?\s*(my|the)?\s*(files?|folder|desktop)?\s*$', "clarification_required", "Ambiguous organization request — what criteria?"),
 ]
 
+UNSUPPORTED_PATTERNS = [
+    (r'^[\d\s\W]{0,2}$', "Input too short or meaningless"),
+    (r'^(asdf|qwer|zxcv|test123|aaa+|bbb+|xxx+)\s*$', "Gibberish input"),
+    (r'^(hack|exploit|bypass security|crack password|steal data)\b', "Potentially harmful request"),
+]
+
 
 def classify_intent(message: str) -> Dict[str, Any]:
     text = message.strip()
@@ -59,5 +65,9 @@ def classify_intent(message: str) -> Dict[str, Any]:
     chitchat = re.search(r'(how are you|what\'?s? (your name|up|going on)|who (are|r) you|what can you do|what do you know)', lower)
     if chitchat:
         return {"intent": "conversation", "confidence": 0.90, "reason": "Conversational chitchat"}
+
+    for pattern, reason in UNSUPPORTED_PATTERNS:
+        if re.search(pattern, lower, re.IGNORECASE):
+            return {"intent": "unsupported", "confidence": 0.90, "reason": reason}
 
     return {"intent": "conversation", "confidence": 0.60, "reason": "No action pattern matched — defaulting to conversation"}

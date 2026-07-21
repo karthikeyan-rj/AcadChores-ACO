@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -81,8 +81,8 @@ async def register(request: Request, req: RegisterRequest):
             "google_id": None,
             "role": "user",
             "account_status": "active",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         oid = await memory_db.insert("users", user_doc)
         user_doc["_id"] = oid
@@ -113,7 +113,7 @@ async def login(request: Request, req: LoginRequest):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         if not verify_password(req.password, user_doc.get("hashed_password", "")):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
-        await memory_db.update("users", {"_id": user_doc["_id"]}, {"last_login_at": datetime.utcnow().isoformat()})
+        await memory_db.update("users", {"_id": user_doc["_id"]}, {"last_login_at": datetime.now(timezone.utc).isoformat()})
         return _token_response(user_doc)
 
     user = await User.find_one(User.email == email)
@@ -123,7 +123,7 @@ async def login(request: Request, req: LoginRequest):
     if not verify_password(req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     await user.save()
     return _token_response(user)
 
@@ -138,7 +138,7 @@ async def login_form(request: Request, form_data: OAuth2PasswordRequestForm = De
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         if not verify_password(form_data.password, user_doc.get("hashed_password", "")):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
-        await memory_db.update("users", {"_id": user_doc["_id"]}, {"last_login_at": datetime.utcnow().isoformat()})
+        await memory_db.update("users", {"_id": user_doc["_id"]}, {"last_login_at": datetime.now(timezone.utc).isoformat()})
         return _token_response(user_doc)
 
     user = await User.find_one(User.email == email)
@@ -148,7 +148,7 @@ async def login_form(request: Request, form_data: OAuth2PasswordRequestForm = De
     if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     await user.save()
     return _token_response(user)
 
@@ -185,8 +185,8 @@ async def google_auth(request: Request, req: GoogleAuthRequest):
                 "google_id": google_sub,
                 "role": "user",
                 "hashed_password": None,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             oid = await memory_db.insert("users", user_doc)
             user_doc["_id"] = oid

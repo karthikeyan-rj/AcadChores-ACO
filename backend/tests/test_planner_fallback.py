@@ -12,7 +12,8 @@ def _good_steps():
 
 
 def _bad_steps():
-    return [{"step_id": "step_1", "name": "do", "agent_type": "invalid", "action": "do_something"}]
+    """Steps with valid agent types but poor structure (missing required params)."""
+    return [{"step_id": "step_1", "name": "navigate somewhere", "agent_type": "browser", "action": "navigate", "parameters": {}}]
 
 
 def _make_service(mock_app):
@@ -96,9 +97,10 @@ class TestCloudFallback:
 
         def mock_validate(self_inner, workflow, prompt):
             steps = workflow.get("steps", [])
-            if steps and steps[0].get("agent_type") in ("browser", "computer"):
+            # Bad steps: valid agent but missing required params (e.g., browser navigate without url)
+            if steps and steps[0].get("parameters", {}).get("url"):
                 return {"is_valid": True, "score": 90, "errors": []}
-            return {"is_valid": False, "score": 30, "errors": []}
+            return {"is_valid": False, "score": 30, "errors": [{"code": "missing_param", "message": "Missing required url"}]}
 
         mock_cloud_result = MagicMock(
             success=True, workflow={"steps": _good_steps()},
